@@ -45,6 +45,9 @@ extensions:
     capabilities:
       - name: okdp.io/hive-metastore
       - name: okdp.io/data-catalog
+    dependencies:
+      - capability: okdp.io/secrets-backend
+        providerScope: system-wide
     compatibility:
       kubernetes: ">=1.28.0"
     parameters: &parameters
@@ -203,3 +206,5 @@ outputs:
 roles:
   - okdp.io/hive-metastore
   - okdp.io/data-catalog
+dependencies:
+  - okdp.io/secrets-backend
