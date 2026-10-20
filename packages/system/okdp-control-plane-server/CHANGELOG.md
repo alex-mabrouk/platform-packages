@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0 (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* the package version no longer embeds the upstream version: the tag is `2.0.0`, the upstream version is `appVersion` in the descriptor
+* the parameters are a closed JSON Schema: an unknown parameter is refused
+* the role `okdp-server` is renamed `okdp.io/control-plane`
+* the dependency on `ingress` is replaced by `okdp.io/identity-provider`: the server creates no ingress, it verifies the tokens of the platform identity provider
+
+### Features
+
+* describe the package with contract 0.2
+
 ## [1.1.0](https://github.com/OKDP/platform-packages/compare/okdp-control-plane-server/v1.0.1...okdp-control-plane-server/v1.1.0) (2026-10-05)
 
 

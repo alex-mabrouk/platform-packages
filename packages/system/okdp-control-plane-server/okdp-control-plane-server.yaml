@@ -16,8 +16,7 @@
 
 apiVersion: v1alpha1
 name: okdp-control-plane-server
-tag: 0.9.0-1.1.0
-protected: false
+tag: 2.0.0 # x-release-please-version
 description: |
   OKDP Server - API backend for the Open Kubernetes Data Platform
 usage:
@@ -25,17 +24,106 @@ usage:
     The API is not exposed on its own host: the console routes /api to it, so
     the browser stays same-origin. Reach it at
     https://{{ .Parameters.consoleHost | default (printf "okdp-ui.%s" .Context.ingress.suffix) }}/api
+# OKDP package descriptor (contract 0.2). Name and version are the name and tag
+# above. Its parameters are the single source of schema.parameters below.
+extensions:
+  okdp.io:
+    apiVersion: okdp.io/v1alpha1
+    kind: PackageDescriptor
+    appVersion: 0.9.0
+    displayName: OKDP control plane server
+    description: API of the platform catalog, projects and service installations
+    category: platform
+    maturity: stable
+    edition: community
+    license: Apache-2.0
+    documentation: https://github.com/OKDP/okdp-control-plane-server
+    maintainer: OKDP
+    keywords: [okdp, control-plane, api]
+    capabilities:
+      - name: okdp.io/control-plane
+    dependencies:
+      - capability: okdp.io/identity-provider
+        providerScope: system-wide
+    compatibility:
+      kubernetes: ">=1.28.0"
+    parameters: &parameters
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      properties:
+        imageRepository:
+          type: string
+          minLength: 1
+          default: "quay.io/okdp/images/okdp-control-plane-server"
+          title: Image repository
+          description: "Server image repository."
+          x-okdp-group: Image
+          x-okdp-order: 1
+          x-okdp-advanced: true
+        imageTag:
+          type: string
+          minLength: 1
+          default: "0.9.0"
+          title: Image tag
+          description: "Server image tag. Set explicitly so the deployed image is pinned rather than following the chart appVersion."
+          x-okdp-group: Image
+          x-okdp-order: 2
+          x-okdp-advanced: true
+        consoleHost:
+          type: string
+          title: Console host
+          description: "Console host, used verbatim as the single allowed origin. Defaults to okdp-ui.<ingress suffix>."
+          x-okdp-group: Console
+          x-okdp-order: 1
+        kubocdNamespace:
+          type: string
+          minLength: 1
+          default: "kubocd-system"
+          title: KuboCD namespace
+          x-okdp-group: Releases
+          x-okdp-order: 1
+        releaseInterval:
+          type: string
+          default: "30m"
+          title: Release interval
+          x-okdp-group: Releases
+          x-okdp-order: 2
+        releaseTimeout:
+          type: string
+          default: "10m"
+          title: Release timeout
+          x-okdp-group: Releases
+          x-okdp-order: 3
+        insecureOciRegistries:
+          type: string
+          default: ""
+          title: Insecure OCI registries
+          description: "Registry hosts reachable over plain HTTP, comma separated. A sandbox concern, empty anywhere else."
+          x-okdp-group: Releases
+          x-okdp-order: 4
+          x-okdp-advanced: true
+        logLevel:
+          type: string
+          enum: [debug, info, warn, error]
+          default: "info"
+          title: Log level
+          x-okdp-group: Logging
+          x-okdp-order: 1
+    endpoints:
+      - name: api
+        kind: api
+        protocol: http
+        authentication: oidc
+        description: Control plane API, routed by the console under /api
+    lifecycle:
+      applyTimeout: 10m
+      rollback: supported
+    health:
+      http: { endpoint: api, path: /health }
+
 schema:
-  parameters:
-    properties:
-      imageRepository: { type: string, default: "quay.io/okdp/images/okdp-control-plane-server", description: "Server image repository." }
-      imageTag: { type: string, default: "0.9.0", description: "Server image tag. Set explicitly so the deployed image is pinned rather than following the chart appVersion." }
-      consoleHost: { type: string, description: "Console host, used verbatim as the single allowed origin. Defaults to okdp-ui.<ingress suffix>." }
-      kubocdNamespace: { type: string, default: "kubocd-system" }
-      logLevel: { type: string, default: "info", enum: [debug, info, warn, error] }
-      releaseInterval: { type: string, default: "30m" }
-      releaseTimeout: { type: string, default: "10m" }
-      insecureOciRegistries: { type: string, default: "", description: "Registry hosts reachable over plain HTTP, comma separated. A sandbox concern, empty anywhere else." }
+  parameters: *parameters
   context:
     properties:
       ingress:
@@ -80,6 +168,6 @@ modules:
         releaseTimeout: {{ .Parameters.releaseTimeout | quote }}
         insecureOciRegistries: {{ .Parameters.insecureOciRegistries | quote }}
 roles:
-  - okdp-server
+  - okdp.io/control-plane
 dependencies:
-  - ingress
+  - okdp.io/identity-provider
