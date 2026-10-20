@@ -108,7 +108,10 @@
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "okdp-control-plane-ui.yaml"
+      ]
     }
   },
   "changelog-sections": [
