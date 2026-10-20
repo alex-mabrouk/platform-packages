@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0 (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* the package version no longer embeds the upstream version: the tag is `2.0.0`, the upstream version is `appVersion` in the descriptor
+* the parameters are a closed JSON Schema: an unknown parameter is refused
+* the role `sparkOperator` is renamed `okdp.io/operator/sparkoperator.k8s.io`
+* a PodMonitor needs the metrics: `podMonitorEnabled: true` with `metricsEnabled: false` is refused
+
+### Features
+
+* describe the package with contract 0.2
+
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/spark-operator/v1.0.0...spark-operator/v1.0.1) (2026-09-25)
 
 
