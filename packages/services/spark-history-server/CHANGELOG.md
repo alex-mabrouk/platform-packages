@@ -7,7 +7,7 @@
 
 * the package version no longer embeds the upstream version: the tag is `2.0.0`, the upstream version is `appVersion` in the descriptor
 * the parameters are a closed JSON Schema: an unknown parameter is refused
-* the role `spark` is renamed `okdp.io/spark-history`; the dependencies are `okdp.io/ingress`, `okdp.io/certificate-manager`, `okdp.io/identity-provider` and `okdp.io/platform-tools`, the object store is a connection
+* the role `spark` is renamed `okdp.io/spark-history`; the dependencies are `okdp.io/ingress`, `okdp.io/certificate-manager`, `okdp.io/identity-provider`, `okdp.io/platform-tools` and `okdp.io/secrets-backend`, the object store is a connection
 * `storage` is a plain string naming the s3 Connection, read through an `inputs` entry
 * `roleMapping` accepts only `admin_groups`, `history_admin_groups`, `modify_groups` and `view_groups`
 

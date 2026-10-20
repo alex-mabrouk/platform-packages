@@ -52,6 +52,8 @@ extensions:
         providerScope: system-wide
       - capability: okdp.io/platform-tools
         providerScope: system-wide
+      - capability: okdp.io/secrets-backend
+        providerScope: system-wide
     compatibility:
       kubernetes: ">=1.28.0"
     parameters: &parameters
@@ -336,3 +338,4 @@ dependencies:
   - okdp.io/certificate-manager
   - okdp.io/identity-provider
   - okdp.io/platform-tools
+  - okdp.io/secrets-backend
