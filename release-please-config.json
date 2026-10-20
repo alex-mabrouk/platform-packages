@@ -47,7 +47,10 @@
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "spark-defaults.yaml"
+      ]
     },
     "packages/services/spark-history-server": {
       "component": "spark-history-server",
