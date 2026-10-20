@@ -1,7 +1,7 @@
 {
   "packages/services/airflow": "2.0.0",
   "packages/services/hive-metastore": "2.0.0",
-  "packages/services/jupyterhub": "1.0.1",
+  "packages/services/jupyterhub": "2.0.0",
   "packages/services/okdp-examples": "1.0.1",
   "packages/services/polaris": "2.0.0",
   "packages/services/spark-defaults": "2.0.0",

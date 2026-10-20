@@ -24,8 +24,7 @@ Packages are deployed through KuboCD **Releases** that reference layered **Conte
 
 ```
 charts/                 # Helm charts owned here, bundled into the packages that reference them
-├── internal-secrets/
-└── oidc-client/
+└── internal-secrets/
 packages/
 ├── system/             # Platform foundation packages
 │   ├── okdp-control-plane-server/
