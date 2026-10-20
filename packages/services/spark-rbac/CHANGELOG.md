@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.0 (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* the package version no longer embeds the upstream version: the tag is `2.0.0`, the upstream version is `appVersion` in the descriptor
+* the parameters are a closed JSON Schema: an unknown parameter is refused
+* the role `spark-rbac` is renamed `okdp.io/spark-rbac`
+
+### Features
+
+* describe the package with contract 0.2
+
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/spark-rbac/v1.0.0...spark-rbac/v1.0.1) (2026-09-25)
 
 

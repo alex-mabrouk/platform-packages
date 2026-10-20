@@ -16,8 +16,7 @@
 
 apiVersion: v1alpha1
 name: spark-rbac
-tag: 1.0.1-1.0.1
-protected: false
+tag: 2.0.0 # x-release-please-version
 description: |
   Helm chart that provisions the Kubernetes ServiceAccount and RBAC resources
   (Role and RoleBinding) required to run Apache Spark on Kubernetes.
@@ -25,13 +24,64 @@ usage:
   text: |
     Helm chart that provisions the Kubernetes ServiceAccount and RBAC resources
     (Role and RoleBinding) required to run Apache Spark on Kubernetes.
+# OKDP package descriptor (contract 0.2). Name and version are the name and tag
+# above. Its parameters are the single source of schema.parameters below.
+extensions:
+  okdp.io:
+    apiVersion: okdp.io/v1alpha1
+    kind: PackageDescriptor
+    appVersion: 1.0.1
+    displayName: Spark RBAC
+    description: Service account and permissions the Spark jobs of a project run with
+    category: processing
+    maturity: stable
+    edition: community
+    license: Apache-2.0
+    documentation: https://spark.apache.org/docs/latest/running-on-kubernetes.html#rbac
+    maintainer: OKDP
+    keywords: [spark, rbac]
+    capabilities:
+      - name: okdp.io/spark-rbac
+    compatibility:
+      kubernetes: ">=1.28.0"
+    parameters: &parameters
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      properties:
+        rbacCreate:
+          type: boolean
+          default: true
+          title: Create role
+          x-okdp-group: RBAC
+          x-okdp-order: 1
+        serviceAccountCreate:
+          type: boolean
+          default: true
+          title: Create service account
+          x-okdp-group: RBAC
+          x-okdp-order: 2
+        serviceAccountName:
+          type: string
+          minLength: 1
+          default: spark
+          title: Service account name
+          x-okdp-group: RBAC
+          x-okdp-order: 3
+        automountServiceAccountToken:
+          type: boolean
+          default: true
+          title: Automount token
+          x-okdp-group: RBAC
+          x-okdp-order: 4
+          x-okdp-advanced: true
+    lifecycle:
+      applyTimeout: 10m
+      rollback: supported
+
 schema:
-  parameters:
-    properties:
-      rbacCreate: { title: "RBAC | Create role | | order:1", type: boolean, default: true }
-      serviceAccountCreate: { title: "RBAC | Create service account | | order:2", type: boolean, default: true }
-      serviceAccountName: { title: "RBAC | Service account name | | order:3 columns:2", type: string, default: spark }
-      automountServiceAccountToken: { title: "RBAC | Automount token | | order:4 advanced:true", type: boolean, default: true }
+  parameters: *parameters
+
 modules:
   - name: main
     timeout: 10m
@@ -48,4 +98,4 @@ modules:
         automount: {{ .Parameters.automountServiceAccountToken }}
 
 roles:
-  - spark-rbac
+  - okdp.io/spark-rbac
