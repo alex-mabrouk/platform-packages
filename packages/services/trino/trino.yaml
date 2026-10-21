@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: trino
-tag: 2.0.0-alpha.1 # x-release-please-version
+tag: 2.0.0-alpha.2 # x-release-please-version
 description: |
   Apache Trino - Distributed SQL query engine designed for large-scale data processing across multiple data sources.
   High-performance, in-memory query engine that enables fast, interactive analytics on diverse data systems.
@@ -31,14 +31,14 @@ extensions:
   okdp.io:
     apiVersion: okdp.io/v1alpha1
     kind: PackageDescriptor
-    appVersion: "480"
+    appVersion: "484"
     displayName: Trino
     description: Distributed SQL engine of a project, federating its Hive and Iceberg catalogs
     category: query
     maturity: stable
     edition: community
     license: Apache-2.0
-    documentation: https://trino.io/docs/480/
+    documentation: https://trino.io/docs/484/
     maintainer: OKDP
     keywords: [trino, sql, query]
     capabilities:
@@ -456,7 +456,7 @@ modules:
       helmRepository:
         url: https://trinodb.github.io/charts/
         chart: trino
-        version: v1.42.1
+        version: 1.45.0
     values: |
 
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
@@ -480,7 +480,7 @@ modules:
 
       image:
         repository: trinodb/trino
-        tag: 480
+        tag: 484
 
       {{- if or $hiveCatalogs $icebergCatalogs }}
       catalogs:

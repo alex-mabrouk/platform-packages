@@ -16,6 +16,7 @@
 ### Features
 
 * describe the package with contract 0.2
+* Trino 484, chart 1.45.0
 
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/trino/v1.0.0...trino/v1.0.1) (2026-09-25)
 
