@@ -1,15 +1,22 @@
 # Changelog
 
-## [2.0.0](https://github.com/OKDP/platform-packages/compare/polaris/v1.0.0...polaris/v2.0.0) (2026-09-25)
+## [2.0.0](https://github.com/OKDP/platform-packages/compare/polaris/v1.0.0...polaris/v2.0.0) (2026-10-21)
 
 
 ### ⚠ BREAKING CHANGES
 
 * **polaris:** one realm, its principals, a generated root account
+* the package version no longer embeds the upstream version: the tag is `2.0.0`, the upstream version is `appVersion` in the descriptor
+* the parameters are a closed JSON Schema: an unknown parameter is refused
+* the roles `data-catalog` and `iceberg-catalog` are renamed `okdp.io/data-catalog` and `okdp.io/iceberg-catalog`; the dependencies are `okdp.io/ingress`, `okdp.io/certificate-manager`, `okdp.io/identity-provider`, `okdp.io/platform-tools` and `okdp.io/secrets-backend`, the database and the object store are connections
+* `db` and `storage` are plain strings naming the database-server and s3 Connections, read through `inputs` entries
+* `oidc.clientProvisioning` defaults to `dcr`: the package registers the server and console clients unless the platform Context says `existing`
 
 ### Features
 
 * **polaris:** one realm, its principals, a generated root account ([b48c912](https://github.com/OKDP/platform-packages/commit/b48c9124eeccd5dc63e5046214261cc0372efda0))
+* describe the package with contract 0.2
+* register the server client and the public console client through dynamic client registration; the console reads its client id from a Secret, with the polaris-console chart 0.2.1
 
 
 ### Bug Fixes

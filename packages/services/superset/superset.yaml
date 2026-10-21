@@ -14,13 +14,9 @@
 #  limitations under the License.
 #
 
-# Consumes database-server Connections (metadata, examples) and one trino
-# connectionRef per datasource item.
-
 apiVersion: v1alpha1
 name: superset
-tag: 6.0.0-1.1.0
-protected: false
+tag: 2.0.0 # x-release-please-version
 description: |
   Apache Superset - Enterprise business intelligence platform for modern data teams.
   Self-service analytics tool that enables users to create interactive dashboards, explore datasets,
@@ -29,38 +25,184 @@ usage:
   text: |
     Apache Superset provides modern data visualization and exploration capabilities.
     Access the UI at https://superset-{{ .Release.spec.targetNamespace }}.{{ .Context.ingress.suffix }}
+# OKDP package descriptor (contract 0.2). Name and version are the name and tag
+# above. Its parameters are the single source of schema.parameters below.
+extensions:
+  okdp.io:
+    apiVersion: okdp.io/v1alpha1
+    kind: PackageDescriptor
+    appVersion: 6.0.0
+    displayName: Apache Superset
+    description: Dashboards and data exploration of a project, on its Trino catalogs
+    category: bi
+    maturity: stable
+    edition: community
+    license: Apache-2.0
+    documentation: https://superset.apache.org/docs/intro
+    maintainer: OKDP
+    keywords: [superset, dashboards, bi]
+    capabilities:
+      - name: okdp.io/bi
+    dependencies:
+      - capability: okdp.io/ingress
+        providerScope: system-wide
+      - capability: okdp.io/certificate-manager
+        providerScope: system-wide
+      - capability: okdp.io/identity-provider
+        providerScope: system-wide
+      - capability: okdp.io/platform-tools
+        providerScope: system-wide
+      - capability: okdp.io/secrets-backend
+        providerScope: system-wide
+    compatibility:
+      kubernetes: ">=1.28.0"
+    parameters: &parameters
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      required: [metadataDb, examplesDb]
+      properties:
+        metadataDb:
+          type: string
+          minLength: 1
+          title: Metadata database
+          description: "Name of the database-server Connection hosting the Superset metadata."
+          x-okdp-group: Cluster
+          x-okdp-order: 1
+          x-okdp-connection: metadata-db
+        load_examples:
+          type: boolean
+          default: true
+          title: Load examples
+          description: "Whether to load superset examples"
+          x-okdp-group: Cluster
+          x-okdp-order: 2
+        examplesDb:
+          type: string
+          minLength: 1
+          title: Examples database
+          description: "Name of the database-server Connection hosting the Superset examples, used when load_examples is true."
+          x-okdp-group: Cluster
+          x-okdp-order: 3
+          x-okdp-connection: examples-db
+        # Chart number and date formats. Any CLDR locale works, the tables come from Babel
+        locale:
+          type: string
+          minLength: 1
+          default: "en"
+          title: Chart locale
+          description: "CLDR locale used by charts to render numbers and dates, for instance en, fr, fr-CH or es. The UI language is not affected."
+          x-okdp-group: Cluster
+          x-okdp-order: 4
+          x-okdp-advanced: true
+        currency:
+          type: string
+          default: ""
+          title: Chart currency
+          description: "ISO 4217 code, for instance EUR. Defaults to the currency of the locale territory when the locale carries one."
+          x-okdp-group: Cluster
+          x-okdp-order: 5
+          x-okdp-advanced: true
+        d3Format:
+          type: object
+          additionalProperties: true
+          title: Number format overrides
+          description: "d3-format locale definition, applied over the one derived from locale. See https://github.com/d3/d3-format#formatLocale"
+          x-okdp-group: Cluster
+          x-okdp-order: 6
+          x-okdp-advanced: true
+          x-okdp-widget: yaml
+        d3TimeFormat:
+          type: object
+          additionalProperties: true
+          title: Date format overrides
+          description: "d3-time-format locale definition, applied over the one derived from locale. See https://github.com/d3/d3-time-format#timeFormatLocale"
+          x-okdp-group: Cluster
+          x-okdp-order: 7
+          x-okdp-advanced: true
+          x-okdp-widget: yaml
+        cpu:
+          type: number
+          default: 0.5
+          multipleOf: 0.25
+          title: CPU (vCPU)
+          x-okdp-group: Sizing
+          x-okdp-order: 1
+          x-okdp-advanced: true
+        memoryGi:
+          type: number
+          default: 2
+          multipleOf: 0.25
+          title: Memory (GiB)
+          x-okdp-group: Sizing
+          x-okdp-order: 2
+          x-okdp-advanced: true
+        workers:
+          type: integer
+          minimum: 1
+          default: 2
+          title: Server workers
+          x-okdp-group: Sizing
+          x-okdp-order: 3
+          x-okdp-advanced: true
+        oidcRoleMapping:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+          title: Role mapping
+          description: "Map of OIDC roles to lists of Superset roles."
+          x-okdp-group: Authentication
+          x-okdp-order: 6
+          x-okdp-advanced: true
+        # Each datasource wires its own Trino connection and catalog. The name is
+        # the display name in the Superset UI.
+        datasources:
+          type: array
+          title: Trino datasources
+          x-okdp-group: Datasources
+          x-okdp-order: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, trino, catalog]
+            properties:
+              name: { type: string, minLength: 1 }
+              trino: { type: string, minLength: 1, description: "Name of the trino Connection of this datasource.", x-okdp-connection: trino }
+              catalog: { type: string, minLength: 1, description: "Trino catalog to expose, as named on the Trino instance." }
+    connections:
+      consumes:
+        - name: metadata-db
+          contract: database-server
+          version: "1"
+          description: Database hosting the Superset metadata
+        - name: examples-db
+          contract: database-server
+          version: "1"
+          description: Database hosting the Superset examples
+        - name: trino
+          contract: trino
+          version: "1"
+          description: Trino instance of each datasource
+    endpoints:
+      - name: ui
+        kind: ui
+        protocol: http
+        authentication: oidc
+        description: Superset web UI and SQL Lab
+    sideEffects:
+      external:
+        - kind: identity-client
+          description: OIDC client registered through dynamic client registration when the platform provisions clients that way
+    lifecycle:
+      applyTimeout: 10m
+      rollback: unsupported
+      irreversible: "The init job upgrades the metadata database schema, which an older Superset cannot use."
+    health:
+      http: { endpoint: ui, path: /health }
+
 schema:
-  parameters:
-    properties:
-      load_examples: { type: boolean, default: true, title: "Cluster | Load examples | | order:2", description: "Whether to load superset examples" }
-      cpu: { type: number, default: 0.5, multipleOf: 0.25, title: "Sizing | CPU (vCPU) | | order:1 columns:2 advanced:true" }
-      memoryGi: { type: number, default: 2, multipleOf: 0.25, title: "Sizing | Memory (GiB) | | order:2 columns:2 advanced:true" }
-      workers: { type: integer, default: 2, title: "Sizing | Server workers | stepper | order:3 advanced:true" }
-      # Chart number and date formats. Any CLDR locale works, the tables come from Babel
-      locale: { type: string, default: "en", title: "Cluster | Chart locale | | order:4 advanced:true", description: "CLDR locale used by charts to render numbers and dates, for instance en, fr, fr-CH or es. The UI language is not affected." }
-      currency: { type: string, default: "", title: "Cluster | Chart currency | | order:5 advanced:true", description: "ISO 4217 code, for instance EUR. Defaults to the currency of the locale territory when the locale carries one." }
-      d3Format: { type: object, properties: {}, additionalProperties: true, title: "Cluster | Number format overrides | | order:6 advanced:true", description: "d3-format locale definition, applied over the one derived from locale. See https://github.com/d3/d3-format#formatLocale" }
-      d3TimeFormat: { type: object, properties: {}, additionalProperties: true, title: "Cluster | Date format overrides | | order:7 advanced:true", description: "d3-time-format locale definition, applied over the one derived from locale. See https://github.com/d3/d3-time-format#timeFormatLocale" }
-      # Superset metadata database
-      metadataDb: { type: connectionRef, contract: database-server, required: true, title: "Cluster | Metadata database | | order:1" }
-      # Database hosting the superset examples (used when load_examples is true)
-      examplesDb: { title: "Cluster | Examples database | | order:3", type: connectionRef, contract: database-server, required: true }
-      # Secret Key for Superset's Flask App. Secret with key: superset_secret_key
-      # OAuth client of THIS instance. The provider comes from the platform context
-      # Secret with keys: client_id, client_secret
-      # Map of OIDC roles to lists of superset roles
-      oidcRoleMapping: { title: "Authentication | Role mapping | | order:6 advanced:true", type: object, properties: {}, additionalProperties: true }
-      # Secret with keys: client_id, client_secret
-      # Datasources: one list, each element wires its own trino connection and
-      # its catalog. The name is the display name in the Superset UI
-      datasources:
-        title: "Datasources | Trino datasources | | order:1"
-        type: array
-        items:
-          properties:
-            name: { type: string, required: true }
-            trino: { type: connectionRef, contract: trino, required: true }
-            catalog: { type: string, required: true, description: "Trino catalog to expose, as named on the Trino instance." }
+  parameters: *parameters
   context:
     properties:
       oidc:
@@ -71,6 +213,12 @@ schema:
           displayName: { type: string, default: keycloak }
           scope: { type: string, default: "openid profile email groups" }
           usePKCE: { type: boolean, default: true }
+          clientProvisioning: { type: string, default: dcr }
+          # Read only when clientProvisioning is dcr.
+          dcr:
+            properties:
+              registrationUrl: { type: string }
+              authMethod: { type: string }
       certificateIssuers:
         required: true
         properties:
@@ -82,7 +230,94 @@ schema:
         properties:
           suffix: { type: string, required: true }
           className: { type: string, required: true }
+
+inputs:
+  - { contract: database-server, alias: metadata-db, fromParameter: metadataDb }
+  - { contract: database-server, alias: examples-db, fromParameter: examplesDb }
+  - { contract: trino, alias: trino, fromParameter: "datasources[].trino" }
+
 modules:
+  # Registers the OIDC client through anonymous Dynamic Client Registration.
+  # Active only when the platform provisions clients that way; the credentials
+  # land in a Secret carrying the same keys the deployment reads.
+  - name: oidc-dcr
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
+    timeout: 10m
+    source:
+      oci:
+        repository: quay.io/adaltas/oidc-dcr
+        tag: 0.3.2
+    values: |
+      {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
+      {{- $release := printf "%v" .Release.metadata.name -}}
+      {{- $dcr := .Context.oidc.dcr | default dict -}}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
+      {{- end }}
+
+      ttl_seconds: 30
+      registration_url: {{ $dcr.registrationUrl | quote }}
+      request:
+        application_type: web
+        client_name: "{{ $release }}-{{ $namespace }}"
+        redirect_uris:
+          - "https://superset-{{ $namespace }}.{{ .Context.ingress.suffix }}/oauth-authorized/{{ .Context.oidc.displayName | default "keycloak" }}"
+        grant_types:
+          - "authorization_code"
+          - "refresh_token"
+        # openid is rejected by Keycloak here.
+        scope: {{ without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid" | join " " | quote }}
+      tls:
+        insecure: false
+        certificate: "certs-bundle"
+      secret: "{{ $release }}-{{ $namespace }}-dcr"
+      mapping:
+        use_default: false
+        key_mapping:
+          client_id: ".client_id"
+          client_secret: ".client_secret"
+
+  # The client Superset obtains Trino tokens with. After oidc-dcr: both write
+  # their hook objects under the same names.
+  - name: oidc-dcr-trino
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
+    dependsOn:
+      - oidc-dcr
+    timeout: 10m
+    source:
+      oci:
+        repository: quay.io/adaltas/oidc-dcr
+        tag: 0.3.2
+    values: |
+      {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
+      {{- $release := printf "%v" .Release.metadata.name -}}
+      {{- $dcr := .Context.oidc.dcr | default dict -}}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
+      {{- end }}
+
+      ttl_seconds: 30
+      registration_url: {{ $dcr.registrationUrl | quote }}
+      request:
+        application_type: web
+        client_name: "{{ $release }}-{{ $namespace }}-trino"
+        redirect_uris:
+          - "https://superset-{{ $namespace }}.{{ .Context.ingress.suffix }}/api/v1/database/oauth2/"
+        grant_types:
+          - "authorization_code"
+          - "refresh_token"
+        # openid is rejected by Keycloak here.
+        scope: {{ without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid" | join " " | quote }}
+      tls:
+        insecure: false
+        certificate: "certs-bundle"
+      secret: "{{ $release }}-{{ $namespace }}-dcr-trino"
+      mapping:
+        use_default: false
+        key_mapping:
+          client_id: ".client_id"
+          client_secret: ".client_secret"
+
   - name: internal-secrets
     source:
       local:
@@ -108,6 +343,8 @@ modules:
 
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
+      {{- $metadataDb := index .Inputs "metadata-db" -}}
+      {{- $examplesDb := index .Inputs "examples-db" -}}
       {{- $oidcEnabled := true -}}
       {{- if hasKey .Context.oidc "enabled" }}{{- $oidcEnabled = .Context.oidc.enabled -}}{{ end -}}
       {{- $oidcUsePKCE := true -}}
@@ -116,10 +353,14 @@ modules:
       {{- $oidcDisplayName := .Context.oidc.displayName | default "keycloak" -}}
       {{- $oauthSecret := printf "creds-%s-oauth2" $release -}}
       {{- $trinoOauthSecret := printf "creds-%s-oauth2-trino" $release -}}
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
+      {{- $oauthSecret = printf "%s-%s-dcr" $release $namespace -}}
+      {{- $trinoOauthSecret = printf "%s-%s-dcr-trino" $release $namespace -}}
+      {{- end }}
       {{- $domain := printf "%v" .Context.ingress.suffix -}}
 
       {{- /* The examples loader is postgresql specific (psycopg2 dialect, main search_path) */ -}}
-      {{- $examplesDatabaseJdbcUrl := printf "postgresql+psycopg2://$DB_EXAMPLES_USER:$DB_EXAMPLES_PASS@%s:%v/%s?options=-csearch_path%%3Dmain" .Parameters.examplesDb.host .Parameters.examplesDb.port .Parameters.examplesDb.dbName -}}
+      {{- $examplesDatabaseJdbcUrl := printf "postgresql+psycopg2://$DB_EXAMPLES_USER:$DB_EXAMPLES_PASS@%s:%v/%s?options=-csearch_path%%3Dmain" $examplesDb.host $examplesDb.port $examplesDb.dbName -}}
 
       {{- /* The oidc connection resolved from the platform context */ -}}
       {{- $oidcBaseUrl := printf "%s/protocol/openid-connect" .Context.oidc.issuerUri -}}
@@ -286,9 +527,9 @@ modules:
         extraConfigs:
           import_datasources.yaml: |
             databases:
-            {{- range .Parameters.datasources }}
-              - database_name: {{ .name }}
-                sqlalchemy_uri: "{{ .trino.uri }}/{{ .catalog }}"
+            {{- range $i, $d := .Parameters.datasources }}
+              - database_name: {{ $d.name }}
+                sqlalchemy_uri: "{{ (index $.InputLists "trino" $i).uri }}/{{ $d.catalog }}"
                 impersonate_user: true
                 extra: |
                   {
@@ -331,12 +572,12 @@ modules:
           - name: DB_USER
             valueFrom:
               secretKeyRef:
-                name: {{ .Parameters.metadataDb.secretRef }}
+                name: {{ $metadataDb.secretRef }}
                 key: username
           - name: DB_PASS
             valueFrom:
               secretKeyRef:
-                name: {{ .Parameters.metadataDb.secretRef }}
+                name: {{ $metadataDb.secretRef }}
                 key: password
           # Superset/Redis credentials
           - name: REDIS_PASSWORD
@@ -387,20 +628,20 @@ modules:
           # Examples
           {{- if .Parameters.load_examples }}
           - name: DB_EXAMPLES_HOST
-            value: {{ .Parameters.examplesDb.host }}
+            value: {{ $examplesDb.host }}
           - name: DB_EXAMPLES_PORT
-            value: "{{ .Parameters.examplesDb.port }}"
+            value: "{{ $examplesDb.port }}"
           - name: DB_EXAMPLES_NAME
-            value: {{ .Parameters.examplesDb.dbName }}
+            value: {{ $examplesDb.dbName }}
           - name: DB_EXAMPLES_USER
             valueFrom:
               secretKeyRef:
-                name: {{ .Parameters.examplesDb.secretRef }}
+                name: {{ $examplesDb.secretRef }}
                 key: username
           - name: DB_EXAMPLES_PASS
             valueFrom:
               secretKeyRef:
-                name: {{ .Parameters.examplesDb.secretRef }}
+                name: {{ $examplesDb.secretRef }}
                 key: password
           {{- end }}
 
@@ -417,35 +658,35 @@ modules:
                 - name: META_PW
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Parameters.metadataDb.secretRef }}
+                      name: {{ $metadataDb.secretRef }}
                       key: password
                 - name: META_USER
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Parameters.metadataDb.secretRef }}
+                      name: {{ $metadataDb.secretRef }}
                       key: username
                 {{- if .Parameters.load_examples }}
                 - name: EX_PW
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Parameters.examplesDb.secretRef }}
+                      name: {{ $examplesDb.secretRef }}
                       key: password
                 - name: EX_USER
                   valueFrom:
                     secretKeyRef:
-                      name: {{ .Parameters.examplesDb.secretRef }}
+                      name: {{ $examplesDb.secretRef }}
                       key: username
                 {{- end }}
               command:
                 - /bin/sh
                 - -c
                 - |
-                  until PGPASSWORD="$META_PW" psql -h {{ .Parameters.metadataDb.host }} -p {{ .Parameters.metadataDb.port }} -U "$META_USER" -d {{ .Parameters.metadataDb.dbName }} -c '\q' 2>/dev/null; do
-                    echo "waiting for database {{ .Parameters.metadataDb.dbName }}"; sleep 3
+                  until PGPASSWORD="$META_PW" psql -h {{ $metadataDb.host }} -p {{ $metadataDb.port }} -U "$META_USER" -d {{ $metadataDb.dbName }} -c '\q' 2>/dev/null; do
+                    echo "waiting for database {{ $metadataDb.dbName }}"; sleep 3
                   done
                   {{- if .Parameters.load_examples }}
-                  until PGPASSWORD="$EX_PW" psql -h {{ .Parameters.examplesDb.host }} -p {{ .Parameters.examplesDb.port }} -U "$EX_USER" -d {{ .Parameters.examplesDb.dbName }} -c '\q' 2>/dev/null; do
-                    echo "waiting for database {{ .Parameters.examplesDb.dbName }}"; sleep 3
+                  until PGPASSWORD="$EX_PW" psql -h {{ $examplesDb.host }} -p {{ $examplesDb.port }} -U "$EX_USER" -d {{ $examplesDb.dbName }} -c '\q' 2>/dev/null; do
+                    echo "waiting for database {{ $examplesDb.dbName }}"; sleep 3
                   done
                   {{- end }}
                   echo "databases reachable"
@@ -461,9 +702,9 @@ modules:
           # Connections to an existing database and cache
           connections:
             # -- PostgreSQL
-            db_host: "{{ .Parameters.metadataDb.host }}"
-            db_port: "{{ .Parameters.metadataDb.port }}"
-            db_name: {{ .Parameters.metadataDb.dbName }}
+            db_host: "{{ $metadataDb.host }}"
+            db_port: "{{ $metadataDb.port }}"
+            db_name: {{ $metadataDb.dbName }}
             db_user: ~
             db_pass: ~
             # -- Redis
@@ -517,7 +758,10 @@ modules:
             mountPath: /cacerts
 
 roles:
-  - dataviz
+  - okdp.io/bi
 dependencies:
-  - database-server
-  - ingress
+  - okdp.io/ingress
+  - okdp.io/certificate-manager
+  - okdp.io/identity-provider
+  - okdp.io/platform-tools
+  - okdp.io/secrets-backend

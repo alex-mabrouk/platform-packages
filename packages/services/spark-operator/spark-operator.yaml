@@ -1,7 +1,22 @@
+#
+# Copyright 2026 The OKDP Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+
 apiVersion: v1alpha1
 name: spark-operator
-tag: 2.4.0-1.0.1
-protected: false
+tag: 2.0.0 # x-release-please-version
 description: |
   Spark Operator 2.4.0 - Kubernetes operator for managing Apache Spark applications
 
@@ -50,33 +65,100 @@ usage:
     kubectl get sparkapplications -n spark-apps
     kubectl describe sparkapplication spark-pi -n spark-apps
 
-schema:
-  parameters:
-    properties:
-      controllerReplicas: { type: integer, default: 1, title: "Controller | Replicas | stepper | order:1" }
-      controllerLogLevel: { type: string, default: "info", enum: ["debug", "info", "warn", "error"], title: "Controller | Log level | | order:2" }
-      controllerWorkers: { type: integer, default: 10, title: "Controller | Workers | stepper | order:3 advanced:true" }
-      jobNamespaces:
-        type: array
-        title: "Controller | Job namespaces | | order:4"
-        items:
+# OKDP package descriptor (contract 0.2). Name and version are the name and tag
+# above. Its parameters are the single source of schema.parameters below.
+extensions:
+  okdp.io:
+    apiVersion: okdp.io/v1alpha1
+    kind: PackageDescriptor
+    appVersion: 2.4.0
+    displayName: Spark Operator
+    description: Kubernetes operator running Apache Spark applications from SparkApplication resources
+    category: processing
+    maturity: stable
+    edition: community
+    license: Apache-2.0
+    documentation: https://www.kubeflow.org/docs/components/spark-operator/
+    maintainer: OKDP
+    keywords: [spark, operator]
+    capabilities:
+      - name: okdp.io/operator/sparkoperator.k8s.io
+    compatibility:
+      kubernetes: ">=1.28.0"
+    parameters: &parameters
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      properties:
+        controllerReplicas:
+          type: integer
+          minimum: 1
+          default: 1
+          title: Replicas
+          x-okdp-group: Controller
+          x-okdp-order: 1
+        controllerLogLevel:
           type: string
-        description: "List of namespaces where Spark jobs can run. If empty string is included, all namespaces will be allowed"
-      metricsEnabled:
-        title: "Monitoring | Enable metrics | | order:1"
-        type: boolean
-        default: true
-        description: "Enable Prometheus metrics"
-      podMonitorEnabled:
-        title: "Monitoring | Create PodMonitor | | order:2 condition:metricsEnabled=true"
-        type: boolean
-        default: false
-        description: "Create PodMonitor for metrics collection"
-      webhookEnabled:
-        title: "Controller | Admission webhook | | order:5 advanced:true"
-        type: boolean
-        default: true
-        description: "Enable admission webhook for validation and mutation"
+          enum: [debug, info, warn, error]
+          default: info
+          title: Log level
+          x-okdp-group: Controller
+          x-okdp-order: 2
+        controllerWorkers:
+          type: integer
+          minimum: 1
+          default: 10
+          title: Workers
+          x-okdp-group: Controller
+          x-okdp-order: 3
+          x-okdp-advanced: true
+        jobNamespaces:
+          type: array
+          items: { type: string }
+          title: Job namespaces
+          description: "List of namespaces where Spark jobs can run. If empty string is included, all namespaces will be allowed"
+          x-okdp-group: Controller
+          x-okdp-order: 4
+        webhookEnabled:
+          type: boolean
+          default: true
+          title: Admission webhook
+          description: "Enable admission webhook for validation and mutation"
+          x-okdp-group: Controller
+          x-okdp-order: 5
+          x-okdp-advanced: true
+        metricsEnabled:
+          type: boolean
+          default: true
+          title: Enable metrics
+          description: "Enable Prometheus metrics"
+          x-okdp-group: Monitoring
+          x-okdp-order: 1
+        podMonitorEnabled:
+          type: boolean
+          default: false
+          title: Create PodMonitor
+          description: "Create PodMonitor for metrics collection. Needs metricsEnabled."
+          x-okdp-group: Monitoring
+          x-okdp-order: 2
+      if:
+        properties:
+          metricsEnabled: { const: false }
+        required: [metricsEnabled]
+      then:
+        properties:
+          podMonitorEnabled: { const: false }
+    sideEffects:
+      clusterResources:
+        - { kind: CustomResourceDefinition, name: sparkapplications.sparkoperator.k8s.io }
+        - { kind: CustomResourceDefinition, name: scheduledsparkapplications.sparkoperator.k8s.io }
+        - { kind: CustomResourceDefinition, name: sparkconnects.sparkoperator.k8s.io }
+    lifecycle:
+      applyTimeout: 10m
+      rollback: supported
+
+schema:
+  parameters: *parameters
   context:
     properties: {}
 
@@ -132,5 +214,4 @@ modules:
           create: false
 
 roles:
-  - sparkOperator
-dependencies: []
+  - okdp.io/operator/sparkoperator.k8s.io

@@ -9,21 +9,30 @@
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "airflow.yaml"
+      ]
     },
     "packages/services/hive-metastore": {
       "component": "hive-metastore",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "hive-metastore.yaml"
+      ]
     },
     "packages/services/jupyterhub": {
       "component": "jupyterhub",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "jupyterhub.yaml"
+      ]
     },
     "packages/services/okdp-examples": {
       "component": "okdp-examples",
@@ -37,63 +46,90 @@
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "polaris.yaml"
+      ]
     },
     "packages/services/spark-defaults": {
       "component": "spark-defaults",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "spark-defaults.yaml"
+      ]
     },
     "packages/services/spark-history-server": {
       "component": "spark-history-server",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "spark-history-server.yaml"
+      ]
     },
     "packages/services/spark-operator": {
       "component": "spark-operator",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "spark-operator.yaml"
+      ]
     },
     "packages/services/spark-rbac": {
       "component": "spark-rbac",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "spark-rbac.yaml"
+      ]
     },
     "packages/services/superset": {
       "component": "superset",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "superset.yaml"
+      ]
     },
     "packages/services/trino": {
       "component": "trino",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "trino.yaml"
+      ]
     },
     "packages/system/okdp-control-plane-server": {
       "component": "okdp-control-plane-server",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "okdp-control-plane-server.yaml"
+      ]
     },
     "packages/system/okdp-control-plane-ui": {
       "component": "okdp-control-plane-ui",
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "okdp-control-plane-ui.yaml"
+      ]
     }
   },
   "changelog-sections": [

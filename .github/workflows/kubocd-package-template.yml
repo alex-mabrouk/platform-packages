@@ -103,21 +103,46 @@ jobs:
           echo "OCI_REPO_PREFIX=${{ inputs.registry }}/${GITHUB_REPOSITORY_OWNER@L}/${{ inputs.oci_package_prefix }}" >> $GITHUB_ENV
         shell: bash
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache: false
+
+      # Built from the fork at a pinned commit: a package carrying an OKDP
+      # descriptor has an extensions block, which the released kubocd refuses,
+      # and --config/--configMediaType/--artifactType are not released either.
       - name: Install KuboCD CLI 🛠️
+        env:
+          KUBOCD_REPO: https://github.com/alex-mabrouk/kubocd.git
+          KUBOCD_REF: 37ee4d0fef2ca8228c3a359567bbb67143f9d6bb
         run: |
-          # v0.3.2 is the first release whose deserializer understands the
-          # Contract schema grammar (contract:, connectionRef, outputs).
-          curl -L -o kubocd https://github.com/kubocd/kubocd/releases/download/v0.3.2/kubocd_Linux_x86_64
-
-          # Make it executable
-          chmod +x kubocd
-
-          # Move to /usr/local/bin
+          git clone --filter=blob:none "${KUBOCD_REPO}" "${RUNNER_TEMP}/kubocd"
+          cd "${RUNNER_TEMP}/kubocd"
+          git checkout --detach "${KUBOCD_REF}"
+          CGO_ENABLED=0 go build \
+            -ldflags "-X kubocd/internal/global.Version=git-${KUBOCD_REF}" \
+            -o kubocd cmd/kubocd/main.go
           sudo mv kubocd /usr/local/bin/
-
-          # Verify installation
           kubocd version
-      
+
+      # Checks the OKDP descriptor and writes the artifact config. The
+      # capability registry is read from the same commit (v0.1.11).
+      # OKDP_CONTRACT is the target contract version the packages are checked
+      # against: every rule up to it applies.
+      - name: Install okdp-contract CLI 🛠️
+        env:
+          OKDP_CONTRACT_REPO: https://github.com/alex-mabrouk/okdp-contract.git
+          OKDP_CONTRACT_REF: 189df21291714b32379304d1eec9c86293b540e9
+        run: |
+          git clone --filter=blob:none "${OKDP_CONTRACT_REPO}" "${RUNNER_TEMP}/okdp-contract"
+          cd "${RUNNER_TEMP}/okdp-contract"
+          git checkout --detach "${OKDP_CONTRACT_REF}"
+          CGO_ENABLED=0 go build -o okdp-contract ./cmd/okdp-contract
+          sudo mv okdp-contract /usr/local/bin/
+          echo "OKDP_CAPABILITIES=${RUNNER_TEMP}/okdp-contract/docs/contract/packaging-capabilities.yaml" >> $GITHUB_ENV
+          echo "OKDP_CONTRACT=0.2" >> $GITHUB_ENV
+
       - name: Install yq
         uses: mikefarah/yq@v4.45.1
 
@@ -247,10 +272,9 @@ jobs:
           for package in ${KUBOCD_PACKAGES}
           do
              echo "::group::kubocd package ${package}"
-             echo "kubocd package ${package} --ociRepoPrefix $OCI_REPO_PREFIX"
              # One broken package must not stop the others: collect the failures
              # and report them all at the end.
-             kubocd package ${package} --ociRepoPrefix $OCI_REPO_PREFIX || FAILED="${FAILED} ${package}"
+             bash .github/scripts/kubocd-package.sh ${package} $OCI_REPO_PREFIX || FAILED="${FAILED} ${package}"
              echo "::endgroup::"
           done
 
@@ -271,10 +295,9 @@ jobs:
           for package in ${KUBOCD_PACKAGES}
           do
              echo "::group::kubocd package ${package}"
-             echo "kubocd package ${package} --ociRepoPrefix $OCI_REPO_PREFIX"
              # One broken package must not stop the others: collect the failures
              # and report them all at the end.
-             kubocd package ${package} --ociRepoPrefix $OCI_REPO_PREFIX || FAILED="${FAILED} ${package}"
+             bash .github/scripts/kubocd-package.sh ${package} $OCI_REPO_PREFIX || FAILED="${FAILED} ${package}"
              echo "::endgroup::"
           done
 

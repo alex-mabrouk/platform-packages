@@ -14,13 +14,9 @@
 #  limitations under the License.
 #
 
-# Consumes one s3 Connection (storage). s3SecretRef and oidcClientSecretRef
-# name this instance's own identities.
-
 apiVersion: v1alpha1
 name: jupyterhub
-tag: 4.3.3-1.0.1
-protected: false
+tag: 2.0.0 # x-release-please-version
 description: |
   JupyterHub - Multi-user interactive development environment for data science and machine learning.
   Provides secure, scalable Jupyter notebook access with integrated authentication, resource management,
@@ -29,54 +25,169 @@ usage:
   text: |
     JupyterHub provides multi-user Jupyter notebook environment with OAuth authentication.
     Access the hub at https://jupyterhub-{{ .Release.spec.targetNamespace }}.{{ .Context.ingress.suffix }}
+# OKDP package descriptor (contract 0.2). Name and version are the name and tag
+# above. Its parameters are the single source of schema.parameters below.
+extensions:
+  okdp.io:
+    apiVersion: okdp.io/v1alpha1
+    kind: PackageDescriptor
+    appVersion: 5.4.4
+    displayName: JupyterHub
+    description: Multi-user notebooks of a project, with PySpark kernels wired to the project data
+    category: development
+    maturity: stable
+    edition: community
+    license: BSD-3-Clause
+    documentation: https://z2jh.jupyter.org/en/stable/
+    maintainer: OKDP
+    keywords: [jupyter, notebooks, pyspark]
+    capabilities:
+      - name: okdp.io/notebooks
+    dependencies:
+      - capability: okdp.io/ingress
+        providerScope: system-wide
+      - capability: okdp.io/certificate-manager
+        providerScope: system-wide
+      - capability: okdp.io/identity-provider
+        providerScope: system-wide
+      - capability: okdp.io/secrets-backend
+        providerScope: system-wide
+    compatibility:
+      kubernetes: ">=1.28.0"
+    parameters: &parameters
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      required: [storage, s3SecretRef]
+      properties:
+        cpu:
+          type: number
+          default: 0.5
+          multipleOf: 0.25
+          title: CPU (vCPU)
+          description: "Notebook (singleuser) pod CPU guarantee. The limit is twice the guarantee."
+          x-okdp-group: Notebooks
+          x-okdp-order: 1
+        memoryGi:
+          type: number
+          default: 1
+          multipleOf: 0.25
+          title: Memory (GiB)
+          description: "Notebook (singleuser) pod memory guarantee. The limit is twice the guarantee."
+          x-okdp-group: Notebooks
+          x-okdp-order: 2
+        welcomeNotebook:
+          type: string
+          default: ""
+          title: Welcome notebook
+          description: "Welcome.ipynb content copied into each user home"
+          x-okdp-group: Notebooks
+          x-okdp-order: 4
+          x-okdp-advanced: true
+          x-okdp-widget: textarea
+        storage:
+          type: string
+          minLength: 1
+          title: Object store
+          description: "Name of the s3 Connection backing the jupyter-fs file browser."
+          x-okdp-group: Storage
+          x-okdp-order: 1
+          x-okdp-connection: storage
+        s3SecretRef:
+          type: string
+          minLength: 1
+          title: S3 credentials secret
+          description: "Secret with keys accessKey/secretKey, this consumer's own S3 identity."
+          x-okdp-group: Storage
+          x-okdp-order: 2
+          x-okdp-secret-ref: true
+        fileBrowserLocations:
+          type: array
+          title: File browser locations
+          description: "jupyter-fs file browser locations (display name + s3 uri)"
+          x-okdp-group: Storage
+          x-okdp-order: 3
+          x-okdp-advanced: true
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, uri]
+            properties:
+              name: { type: string, minLength: 1 }
+              uri: { type: string, minLength: 1 }
+        oidcRoleMapping:
+          type: object
+          additionalProperties: true
+          title: Role mapping
+          description: "Optional GenericOAuthenticator overrides (claim_groups_key, allowed_groups, admin_groups, ...)"
+          x-okdp-group: Authentication
+          x-okdp-order: 3
+          x-okdp-advanced: true
+          x-okdp-widget: yaml
+        # PySpark connections: each item carries its final spark conf lines
+        # (properties) and optionally its own S3 identity (keys accessKey/secretKey).
+        # pyspark lists the connection names to enable.
+        pyspark:
+          type: array
+          items: { type: string }
+          title: Enabled connections
+          description: "Names of the connections below to wire into the PySpark kernel. Empty leaves the kernel without S3A or catalog settings."
+          x-okdp-group: Spark
+          x-okdp-order: 1
+          x-okdp-advanced: true
+        connections:
+          type: array
+          title: Connections
+          x-okdp-group: Spark
+          x-okdp-order: 2
+          x-okdp-advanced: true
+          items:
+            type: object
+            additionalProperties: false
+            required: [name]
+            properties:
+              name: { type: string, minLength: 1 }
+              properties: { type: string }
+              s3SecretRef: { type: string, minLength: 1, x-okdp-secret-ref: true }
+        sparkDefaults:
+          type: object
+          additionalProperties: true
+          title: Conf defaults
+          description: "Spark conf defaults injected into PYSPARK_SUBMIT_ARGS (final values)"
+          x-okdp-group: Spark
+          x-okdp-order: 4
+          x-okdp-advanced: true
+          x-okdp-widget: yaml
+    connections:
+      consumes:
+        - name: storage
+          contract: s3
+          version: "1"
+          description: Object store backing the file browser
+    endpoints:
+      - name: hub
+        kind: ui
+        protocol: http
+        authentication: oidc
+        description: JupyterHub and the users' notebook servers
+    data:
+      - name: homes
+        kind: volume
+        description: Home volume of each user, and the hub database
+        backup: https://z2jh.jupyter.org/en/stable/jupyterhub/customizing/user-storage.html
+    sideEffects:
+      external:
+        - kind: identity-client
+          description: OIDC client registered through dynamic client registration when the platform provisions clients that way
+    lifecycle:
+      applyTimeout: 15m
+      rollback: unsupported
+      irreversible: "A newer JupyterHub upgrades the hub database schema when it starts."
+    health:
+      http: { endpoint: hub, path: /hub/health }
+
 schema:
-  parameters:
-    properties:
-      memoryGi: { type: number, default: 1, multipleOf: 0.25, title: "Notebooks | Memory (GiB) | | order:2 columns:2", description: "Notebook (singleuser) pod memory (GiB) for requests/limits." }
-      cpu:      { type: number, default: 0.5, multipleOf: 0.25, title: "Notebooks | CPU (vCPU) | | order:1 columns:2", description: "Notebook (singleuser) pod CPU (vCPU) for requests/limits." }
-      # The S3 store backing the jupyter-fs file browser.
-      storage: { type: connectionRef, contract: s3, required: true, title: "Storage | Object store | | order:1" }
-      # This consumer's own S3 identity. Secret with keys: accessKey, secretKey.
-      s3SecretRef: { type: string, required: true, title: "Storage | S3 credentials secret | | order:2" }
-      # OAuth client Secret (client_id, client_secret, JUPYTERHUB_CRYPT_KEY).
-      # Required in existing provisioning mode, generated in kubauth mode.
-      oidcRoleMapping:
-        type: object
-        title: "Authentication | Role mapping | | order:3 advanced:true"
-        description: "Optional GenericOAuthenticator overrides (claim_groups_key, allowed_groups, admin_groups, ...)"
-        properties: {}
-        additionalProperties: true
-      fileBrowserLocations:
-        type: array
-        title: "Storage | File browser locations | | order:3 advanced:true"
-        description: "jupyter-fs file browser locations (display name + s3 uri)"
-        items:
-          properties:
-            name: { type: string, required: true }
-            uri: { type: string, required: true }
-      welcomeNotebook: { type: string, default: "", title: "Notebooks | Welcome notebook | textarea | order:4 advanced:true", description: "Welcome.ipynb content copied into each user home" }
-      # PySpark connections: each item carries its final spark conf lines
-      # (properties) and optionally its own S3 identity (keys accessKey/secretKey).
-      # pyspark lists the connection names to enable.
-      connections:
-        type: array
-        title: "Spark | Connections | | order:2 advanced:true"
-        items:
-          properties:
-            name: { type: string, required: true }
-            properties: { type: string }
-            s3SecretRef: { type: string }
-      pyspark:
-        type: array
-        title: "Spark | Enabled connections | | order:1 advanced:true"
-        description: "Names of the connections below to wire into the PySpark kernel. Empty leaves the kernel without S3A or catalog settings."
-        items: { type: string }
-      sparkDefaults:
-        title: "Spark | Conf defaults | | order:4 advanced:true"
-        type: object
-        description: "Spark conf defaults injected into PYSPARK_SUBMIT_ARGS (final values)"
-        properties: {}
-        additionalProperties: true
+  parameters: *parameters
   context:
     properties:
       certificateIssuers:
@@ -101,34 +212,57 @@ schema:
           tokenUrl: { type: string, required: true }
           userinfoUrl: { type: string, required: true }
           displayName: { type: string, default: keycloak }
-          # Who makes the OAuth client. In the kubauth mode this package
-          # generates it, in the existing one it is handed a Secret name.
-          clientProvisioning: { type: string, default: existing }
-          kubauth:
+          scope: { type: string, default: "openid profile email groups" }
+          clientProvisioning: { type: string, default: dcr }
+          # Read only when clientProvisioning is dcr.
+          dcr:
             properties:
-              namespace: { type: string }
+              registrationUrl: { type: string }
+              authMethod: { type: string }
+
+inputs:
+  - { contract: s3, alias: storage, fromParameter: storage }
+
 modules:
-  # Active only when the platform says kubauth makes the clients.
-  - name: oidc-client
-    enabled: "{{ eq (.Context.oidc.clientProvisioning | default \"existing\") \"kubauth\" }}"
+  # Registers the OIDC client through anonymous Dynamic Client Registration.
+  # Active only when the platform provisions clients that way; the credentials
+  # land in a Secret carrying the same keys the deployment reads.
+  - name: oidc-dcr
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
+    timeout: 10m
     source:
-      local:
-        path: ../../../charts/oidc-client
+      oci:
+        repository: quay.io/adaltas/oidc-dcr
+        tag: 0.3.2
     values: |
-      {{- $client := printf "%s-%s" .Release.metadata.name .Release.spec.targetNamespace }}
-      {{- $hubUrl := printf "https://jupyterhub-%s.%s" .Release.spec.targetNamespace .Context.ingress.suffix }}
-      # The clients live in one shared namespace, so the name carries the
-      # project namespace: two same-named Releases would share a client.
-      clientName: "{{ $client }}"
-      oidcNamespace: "{{ (.Context.oidc.kubauth | default dict).namespace }}"
-      credentialsSecretName: "{{ $client }}-oidc-creds"
-      # Encrypts JupyterHub auth state.
-      extraGeneratedKeys:
-        - JUPYTERHUB_CRYPT_KEY
-      redirectURIs:
-        - "{{ $hubUrl }}/hub/oauth_callback"
-      displayName: "JupyterHub ({{ .Release.metadata.name }})"
-      description: "OIDC client for JupyterHub {{ .Release.metadata.name }} in {{ .Release.spec.targetNamespace }}"
+      {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
+      {{- $release := printf "%v" .Release.metadata.name -}}
+      {{- $dcr := .Context.oidc.dcr | default dict -}}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
+      {{- end }}
+
+      ttl_seconds: 30
+      registration_url: {{ $dcr.registrationUrl | quote }}
+      request:
+        application_type: web
+        client_name: "{{ $release }}-{{ $namespace }}"
+        redirect_uris:
+          - "https://jupyterhub-{{ $namespace }}.{{ .Context.ingress.suffix }}/hub/oauth_callback"
+        grant_types:
+          - "authorization_code"
+          - "refresh_token"
+        # openid is rejected by Keycloak here.
+        scope: {{ without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid" | join " " | quote }}
+      tls:
+        insecure: false
+        certificate: "certs-bundle"
+      secret: "{{ $release }}-{{ $namespace }}-dcr"
+      mapping:
+        use_default: false
+        key_mapping:
+          client_id: ".client_id"
+          client_secret: ".client_secret"
 
   - name: spark-rbac
     timeout: 10m
@@ -168,7 +302,7 @@ modules:
 
       {{- $oidcUserInfoUrl := .Context.oidc.userinfoUrl -}}
 
-      {{- $storageApiUrl := .Parameters.storage.apiUrl -}}
+      {{- $storageApiUrl := .Inputs.storage.apiUrl -}}
 
       {{- $jupyterUrl := printf "https://jupyterhub-%s.%s" $namespace $domain -}}
       {{- $jupyterHost := regexReplaceAll "^https?://" $jupyterUrl "" -}}
@@ -200,14 +334,8 @@ modules:
         {{- $_ := set $jupyterConnectionsByName $connection.name $connection -}}
       {{- end }}
 
-      {{/* The credentials Secret is the one named by the parameter when
-           somebody else made the client, and the one this package generated
-           when kubauth provisions it. Same keys either way, so everything
-           below reads it the same. */}}
       {{- $oidcSecret := printf "creds-%s-oauth2" .Release.metadata.name -}}
-      {{- if eq (.Context.oidc.clientProvisioning | default "existing") "kubauth" -}}
-        {{- $oidcSecret = printf "%s-%s-oidc-creds" .Release.metadata.name .Release.spec.targetNamespace -}}
-      {{- end }}
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}{{- $oidcSecret = printf "%s-%s-dcr" .Release.metadata.name .Release.spec.targetNamespace }}{{- end }}
       # Fix resource naming conflicts by using release name as prefix
       fullnameOverride: "{{ .Release.metadata.name }}"
       nameOverride: "{{ .Release.metadata.name }}"
@@ -231,11 +359,6 @@ modules:
               secretKeyRef:
                 name: {{ $oidcSecret }}
                 key: client_secret
-          JUPYTERHUB_CRYPT_KEY:
-            valueFrom:
-              secretKeyRef:
-                name: {{ $oidcSecret }}
-                key: JUPYTERHUB_CRYPT_KEY
         config:
           # https://oauthenticator.readthedocs.io/en/latest/how-to/refresh.html
           JupyterHub:
@@ -574,7 +697,7 @@ modules:
                   {{- $connectionProperties = $connectionProperties
                         | replace "{{ storage.endpoints.api }}" $storageApiUrl
                         | replace "{{ storage.endpoints.apiUrl }}" $storageApiUrl
-                        | replace "{{ storage.region }}" (printf "%v" $.Parameters.storage.region) -}}
+                        | replace "{{ storage.region }}" (printf "%v" $.Inputs.storage.region) -}}
                   {{- if $connectionS3SecretRef }}
                     {{- $connectionProperties = $connectionProperties
                           | replace "$(S3_ACCESS_KEY)" (printf "$(%s_S3_ACCESS_KEY)" $connectionEnvPrefix)
@@ -647,7 +770,9 @@ modules:
           enabled: false
 
 roles:
-  - notebooks
+  - okdp.io/notebooks
 dependencies:
-  - ingress
-  - storage
+  - okdp.io/ingress
+  - okdp.io/certificate-manager
+  - okdp.io/identity-provider
+  - okdp.io/secrets-backend

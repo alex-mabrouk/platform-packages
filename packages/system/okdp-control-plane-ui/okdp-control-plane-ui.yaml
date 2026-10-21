@@ -16,8 +16,7 @@
 
 apiVersion: v1alpha1
 name: okdp-control-plane-ui
-tag: 0.9.1-1.1.0
-protected: false
+tag: 2.0.0 # x-release-please-version
 description: |
   OKDP UI - Frontend web interface for the Open Kubernetes Data Platform
 usage:
@@ -26,18 +25,127 @@ usage:
     https://{{ .Parameters.host | default (printf "okdp-ui.%s" .Context.ingress.suffix) }}
     The same ingress routes /api to the okdp-server Service, so the browser
     never leaves the origin and the API is never exposed on its own host.
+# OKDP package descriptor (contract 0.2). Name and version are the name and tag
+# above. Its parameters are the single source of schema.parameters below.
+extensions:
+  okdp.io:
+    apiVersion: okdp.io/v1alpha1
+    kind: PackageDescriptor
+    appVersion: 0.9.1
+    displayName: OKDP control plane UI
+    description: Web console of the platform, serving the control plane API on the same origin
+    category: platform
+    maturity: stable
+    edition: community
+    license: Apache-2.0
+    documentation: https://github.com/OKDP/okdp-control-plane-ui
+    maintainer: OKDP
+    keywords: [okdp, control-plane, console]
+    capabilities:
+      - name: okdp.io/ui
+    dependencies:
+      - capability: okdp.io/control-plane
+        providerScope: system-wide
+      - capability: okdp.io/ingress
+        providerScope: system-wide
+      - capability: okdp.io/certificate-manager
+        providerScope: system-wide
+      - capability: okdp.io/identity-provider
+        providerScope: system-wide
+    compatibility:
+      kubernetes: ">=1.28.0"
+    parameters: &parameters
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      required: [oidcAuthority]
+      properties:
+        imageRepository:
+          type: string
+          minLength: 1
+          default: "quay.io/okdp/images/okdp-control-plane-ui"
+          title: Image repository
+          description: "Console image repository."
+          x-okdp-group: Image
+          x-okdp-order: 1
+          x-okdp-advanced: true
+        imageTag:
+          type: string
+          minLength: 1
+          default: "0.9.1"
+          title: Image tag
+          description: "Console image tag. Set explicitly so the deployed image is pinned rather than following the chart appVersion."
+          x-okdp-group: Image
+          x-okdp-order: 2
+          x-okdp-advanced: true
+        host:
+          type: string
+          title: Host
+          description: "Console host. Defaults to okdp-ui.<ingress suffix>."
+          x-okdp-group: Exposure
+          x-okdp-order: 1
+        oidcAuthority:
+          type: string
+          minLength: 1
+          title: OIDC authority
+          description: "Issuer the console redirects to, injected at container start rather than baked into the bundle."
+          x-okdp-group: Authentication
+          x-okdp-order: 1
+        oidcClientId:
+          type: string
+          minLength: 1
+          default: "okdp-ui"
+          title: OIDC client ID
+          x-okdp-group: Authentication
+          x-okdp-order: 2
+        rolesClaim:
+          type: string
+          minLength: 1
+          default: "groups"
+          title: Roles claim
+          description: "Claim of the ID token carrying the caller's roles. Dotted paths are resolved. Keycloak keeps realm_access out of the ID token, hence groups."
+          x-okdp-group: Authentication
+          x-okdp-order: 3
+        adminRole:
+          type: string
+          minLength: 1
+          default: "platform_admin"
+          title: Admin role
+          description: "Role that opens the administration screens."
+          x-okdp-group: Authentication
+          x-okdp-order: 4
+        backendService:
+          type: string
+          minLength: 1
+          default: "okdp-control-plane-server-main"
+          title: API Service
+          description: "In-cluster Service the ingress routes /api to. KuboCD names a Service <release>-<module>, hence the -main suffix when the server Release is named okdp-control-plane-server."
+          x-okdp-group: Backend
+          x-okdp-order: 1
+          x-okdp-advanced: true
+        backendPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          default: 8093
+          title: API port
+          x-okdp-group: Backend
+          x-okdp-order: 2
+          x-okdp-advanced: true
+    endpoints:
+      - name: console
+        kind: ui
+        protocol: http
+        authentication: oidc
+        description: Web console, with the control plane API under /api
+    lifecycle:
+      applyTimeout: 10m
+      rollback: supported
+    health:
+      http: { endpoint: console, path: / }
+
 schema:
-  parameters:
-    properties:
-      imageRepository: { type: string, default: "quay.io/okdp/images/okdp-control-plane-ui", description: "Console image repository." }
-      imageTag: { type: string, default: "0.9.1", description: "Console image tag. Set explicitly so the deployed image is pinned rather than following the chart appVersion." }
-      host: { type: string, description: "Console host. Defaults to okdp-ui.<ingress suffix>." }
-      oidcAuthority: { type: string, required: true, description: "Issuer the console redirects to, injected at container start rather than baked into the bundle." }
-      oidcClientId: { type: string, default: "okdp-ui" }
-      rolesClaim: { type: string, default: "groups", description: "Claim of the ID token carrying the caller's roles. Dotted paths are resolved. Keycloak keeps realm_access out of the ID token, hence groups." }
-      adminRole: { type: string, default: "platform_admin", description: "Role that opens the administration screens." }
-      backendService: { type: string, default: "okdp-control-plane-server-main", description: "In-cluster Service the ingress routes /api to. KuboCD names a Service <release>-<module>, hence the -main suffix when the server Release is named okdp-control-plane-server." }
-      backendPort: { type: integer, default: 8093 }
+  parameters: *parameters
   context:
     properties:
       ingress:
@@ -84,7 +192,9 @@ modules:
         clusterIssuer: {{ .Context.certificateIssuers.selfSigned.name | quote }}
         tlsSecretName: okdp-ui-tls
 roles:
-  - okdp-ui
+  - okdp.io/ui
 dependencies:
-  - okdp-server
-  - ingress
+  - okdp.io/control-plane
+  - okdp.io/ingress
+  - okdp.io/certificate-manager
+  - okdp.io/identity-provider

@@ -1,9 +1,6 @@
-# Consumes db (database-server) as a deployment gate only: the chart reads
-# the connection string from the Secret named by metadataSecret.
 apiVersion: v1alpha1
 name: airflow
-tag: 3.2.1-1.0.1
-protected: false
+tag: 2.0.0 # x-release-please-version
 description: |
   Apache Airflow 3.2.1 - Workflow orchestration platform with Spark Operator integration
 
@@ -16,7 +13,165 @@ usage:
       URL: https://airflow-{{ .Release.spec.targetNamespace }}.{{ .Context.ingress.suffix }}
       Authenticate via the configured OIDC provider.
 
+# OKDP package descriptor (contract 0.2). Name and version are the name and tag
+# above. Its parameters are the single source of schema.parameters below.
+extensions:
+  okdp.io:
+    apiVersion: okdp.io/v1alpha1
+    kind: PackageDescriptor
+    appVersion: 3.2.1
+    displayName: Apache Airflow
+    description: Scheduling and running the data pipelines of a project, with the Kubernetes executor
+    category: orchestration
+    maturity: stable
+    edition: community
+    license: Apache-2.0
+    documentation: https://airflow.apache.org/docs/apache-airflow/3.2.1/
+    maintainer: OKDP
+    keywords: [airflow, workflow, dag]
+    capabilities:
+      - name: okdp.io/workflow-orchestration
+    dependencies:
+      - capability: okdp.io/ingress
+        providerScope: system-wide
+      - capability: okdp.io/certificate-manager
+        providerScope: system-wide
+      - capability: okdp.io/identity-provider
+        providerScope: system-wide
+      - capability: okdp.io/platform-tools
+        providerScope: system-wide
+      - capability: okdp.io/secrets-backend
+        providerScope: system-wide
+    compatibility:
+      kubernetes: ">=1.28.0"
+    parameters: &parameters
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      required: [db, metadataSecret, storage, s3SecretRef]
+      properties:
+        db:
+          type: string
+          minLength: 1
+          title: Metadata database
+          description: "Name of the database-server Connection hosting the Airflow metadata database. Airflow waits for it; the connection string comes from metadataSecret."
+          x-okdp-group: Cluster
+          x-okdp-order: 2
+          x-okdp-connection: db
+        metadataSecret:
+          type: string
+          minLength: 1
+          title: Metadata connection secret
+          description: "Secret with key connection holding the full SQLAlchemy connection string."
+          x-okdp-group: Cluster
+          x-okdp-order: 3
+          x-okdp-secret-ref: true
+        # CeleryExecutor is left out: it needs a broker and workers, and this package
+        # pins workers.replicas to 0 with no Redis.
+        schedulerMemoryGi:
+          type: number
+          default: 1
+          multipleOf: 0.25
+          title: Scheduler memory (GiB)
+          x-okdp-group: Sizing
+          x-okdp-order: 1
+          x-okdp-advanced: true
+        webserverMemoryGi:
+          type: number
+          default: 1
+          multipleOf: 0.25
+          title: Webserver memory (GiB)
+          x-okdp-group: Sizing
+          x-okdp-order: 2
+          x-okdp-advanced: true
+        dagProcessorMemoryGi:
+          type: number
+          default: 1
+          multipleOf: 0.25
+          title: DAG processor memory (GiB)
+          x-okdp-group: Sizing
+          x-okdp-order: 3
+          x-okdp-advanced: true
+        dagProcessorCpuCores:
+          type: number
+          default: 0.75
+          multipleOf: 0.05
+          title: DAG processor CPU (cores)
+          x-okdp-group: Sizing
+          x-okdp-order: 4
+          x-okdp-advanced: true
+        oidcRoleMapping:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+          title: Role mapping
+          description: "Map of OIDC groups to lists of Airflow roles."
+          x-okdp-group: Authentication
+          x-okdp-order: 4
+          x-okdp-advanced: true
+        storage:
+          type: string
+          minLength: 1
+          title: Object store
+          description: "Name of the s3 Connection the DAGs read and write."
+          x-okdp-group: Storage
+          x-okdp-order: 5
+          x-okdp-connection: storage
+        s3SecretRef:
+          type: string
+          minLength: 1
+          title: S3 credentials secret
+          description: "Secret with keys accessKey and secretKey granting the DAGs access to the object store."
+          x-okdp-group: Storage
+          x-okdp-order: 6
+          x-okdp-secret-ref: true
+        # Free-form: any chart dags.gitSync value can be set (enabled, repo, branch,
+        # ref, depth, subPath, period, ...).
+        dagsGitSync:
+          type: object
+          additionalProperties: true
+          title: Git sync
+          description: "Chart dags.gitSync values. credentialsSecret.name carries the git credentials Secret name."
+          x-okdp-group: DAGs
+          x-okdp-order: 1
+          x-okdp-widget: yaml
+          properties:
+            credentialsSecret:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, x-okdp-secret-ref: true }
+    connections:
+      consumes:
+        - name: db
+          contract: database-server
+          version: "1"
+          description: Database hosting the Airflow metadata, waited for before the deployment
+        - name: storage
+          contract: s3
+          version: "1"
+          description: Object store the DAGs read and write
+    endpoints:
+      - name: ui
+        kind: ui
+        protocol: http
+        authentication: oidc
+        description: Airflow web UI and REST API
+    sideEffects:
+      external:
+        - kind: identity-client
+          description: OIDC client registered through dynamic client registration when the platform provisions clients that way
+    lifecycle:
+      applyTimeout: 15m
+      rollback: unsupported
+      irreversible: "The migration job upgrades the metadata database schema, which an older Airflow cannot use."
+    health:
+      http: { endpoint: ui, path: /api/v2/monitor/health }
+
 schema:
+  parameters: *parameters
   context:
     properties:
       certificateIssuers:
@@ -39,38 +194,23 @@ schema:
           enabled: { type: boolean, default: true }
           scope: { type: string, default: "openid profile email groups" }
           insecureSkipVerify: { type: boolean, default: false }
-          clientProvisioning: { type: string, default: existing }
+          clientProvisioning: { type: string, default: dcr }
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
               registrationUrl: { type: string }
               authMethod: { type: string }
-  parameters:
-    properties:
-      db: { type: connectionRef, contract: database-server, required: true, title: "Cluster | Metadata database | | order:2", description: "Connection to the SQL database server hosting the Airflow metadata database." }
-      metadataSecret: { type: string, required: true, title: "Cluster | Metadata connection secret | | order:3", description: "Secret with key connection holding the full SQLAlchemy connection string." }
-      # CeleryExecutor is left out: it needs a broker and workers, and this package
-      # pins workers.replicas to 0 with no Redis.
-      schedulerMemoryGi: { type: number, default: 1, multipleOf: 0.25, title: "Sizing | Scheduler memory (GiB) | | order:1 columns:2 advanced:true" }
-      webserverMemoryGi: { type: number, default: 1, multipleOf: 0.25, title: "Sizing | Webserver memory (GiB) | | order:2 columns:2 advanced:true" }
-      dagProcessorMemoryGi: { type: number, default: 1, multipleOf: 0.25, title: "Sizing | DAG processor memory (GiB) | | order:3 columns:2 advanced:true" }
-      dagProcessorCpuCores: { type: number, default: 0.75, multipleOf: 0.05, title: "Sizing | DAG processor CPU (cores) | | order:4 columns:2 advanced:true" }
-      oidcRoleMapping: { type: object, properties: {}, additionalProperties: true, title: "Authentication | Role mapping | | order:4 advanced:true", description: "Map of OIDC groups to lists of Airflow roles." }
-      storage: { type: connectionRef, contract: s3, required: true, title: "Storage | Object store | | order:5", description: "Connection to the S3-compatible object store the DAGs read and write." }
-      s3SecretRef: { type: string, required: true, title: "Storage | S3 credentials secret | | order:6", description: "Secret with keys accessKey and secretKey granting the DAGs access to the object store." }
-      # Free-form key/value map: the keys are not frozen, so any git-sync value
-      # can be set (enabled, repo, branch, ref, depth, subPath, period,
-      # credentialsSecret.name). The 'key-value-scalar' widget types each value
-      # by its syntax: unquoted true/false is a boolean, an unquoted number is
-      # an int/float, and quotes force a string.
-      dagsGitSync: { type: object, properties: {}, additionalProperties: true, title: "DAGs | Git sync | key-value-scalar | order:1", description: "Chart dags.gitSync values. Unquoted true/false is a boolean, an unquoted number is an int/float, quote to force a string. credentialsSecret.name carries the git credentials Secret name." }
+
+inputs:
+  - { contract: database-server, alias: db, fromParameter: db }
+  - { contract: s3, alias: storage, fromParameter: storage }
 
 modules:
   # Registers the OIDC client through anonymous Dynamic Client Registration.
   # Active only when the platform provisions clients that way; the credentials
   # land in a Secret carrying the same keys the deployment reads.
   - name: oidc-dcr
-    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}'
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
@@ -80,7 +220,7 @@ modules:
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "existing") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
       {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
       {{- end }}
 
@@ -150,7 +290,7 @@ modules:
       {{- if hasKey .Context.oidc "enabled" }}{{- $airflowOidcEnabled = .Context.oidc.enabled }}{{ end }}
       {{- /* offline_access here must stay registered by the oidc-dcr module above. */}}
       {{- $airflowOidcScope := printf "%s offline_access" (.Context.oidc.scope | default "openid profile email groups") | replace " " "+" }}
-      {{- $airflowDCR := eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}
+      {{- $airflowDCR := eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
       {{- /* In dcr mode the registration job writes the credentials, under the same keys. */}}
       {{- $airflowOauthSecret := printf "creds-%s-oauth2" .Release.metadata.name }}
       {{- if $airflowDCR }}{{- $airflowOauthSecret = printf "%s-%s-dcr" .Release.metadata.name .Release.spec.targetNamespace }}{{- end }}
@@ -191,9 +331,9 @@ modules:
           value: {{ $airflowOidcScope | quote }}
       {{- end }}
         - name: AWS_ENDPOINT_URL_S3
-          value: {{ .Parameters.storage.internalUrl | quote }}
+          value: {{ .Inputs.storage.internalUrl | quote }}
         - name: AWS_REGION
-          value: {{ .Parameters.storage.region | quote }}
+          value: {{ .Inputs.storage.region | quote }}
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -416,10 +556,11 @@ modules:
       jwtSecretName: {{ printf "creds-%s-internal" .Release.metadata.name }}
 
 roles:
-  - airflow
+  - okdp.io/workflow-orchestration
 
 dependencies:
-  - external-secrets
-  - database-server
-  - ingress
-  - storage
+  - okdp.io/ingress
+  - okdp.io/certificate-manager
+  - okdp.io/identity-provider
+  - okdp.io/platform-tools
+  - okdp.io/secrets-backend
