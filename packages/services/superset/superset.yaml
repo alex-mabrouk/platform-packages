@@ -213,7 +213,7 @@ schema:
           displayName: { type: string, default: keycloak }
           scope: { type: string, default: "openid profile email groups" }
           usePKCE: { type: boolean, default: true }
-          clientProvisioning: { type: string, default: existing }
+          clientProvisioning: { type: string, default: dcr }
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
@@ -241,7 +241,7 @@ modules:
   # Active only when the platform provisions clients that way; the credentials
   # land in a Secret carrying the same keys the deployment reads.
   - name: oidc-dcr
-    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}'
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
@@ -251,7 +251,7 @@ modules:
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "existing") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
       {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
       {{- end }}
 
@@ -280,7 +280,7 @@ modules:
   # The client Superset obtains Trino tokens with. After oidc-dcr: both write
   # their hook objects under the same names.
   - name: oidc-dcr-trino
-    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}'
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     dependsOn:
       - oidc-dcr
     timeout: 10m
@@ -292,7 +292,7 @@ modules:
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "existing") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
       {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
       {{- end }}
 
@@ -353,7 +353,7 @@ modules:
       {{- $oidcDisplayName := .Context.oidc.displayName | default "keycloak" -}}
       {{- $oauthSecret := printf "creds-%s-oauth2" $release -}}
       {{- $trinoOauthSecret := printf "creds-%s-oauth2-trino" $release -}}
-      {{- if eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
       {{- $oauthSecret = printf "%s-%s-dcr" $release $namespace -}}
       {{- $trinoOauthSecret = printf "%s-%s-dcr-trino" $release $namespace -}}
       {{- end }}
