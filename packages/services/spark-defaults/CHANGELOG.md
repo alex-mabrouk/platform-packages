@@ -12,6 +12,7 @@
 ### Features
 
 * describe the package with contract 0.2
+* spark-defaults chart 1.0.1
 
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/spark-defaults/v1.0.0...spark-defaults/v1.0.1) (2026-09-25)
 
