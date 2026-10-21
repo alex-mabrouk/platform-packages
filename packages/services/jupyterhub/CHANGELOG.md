@@ -9,11 +9,17 @@
 * the parameters are a closed JSON Schema: an unknown parameter is refused
 * the role `notebooks` is renamed `okdp.io/notebooks`; the dependencies are `okdp.io/ingress`, `okdp.io/certificate-manager`, `okdp.io/identity-provider` and `okdp.io/secrets-backend`, the object store is a connection
 * `storage` is a plain string naming the s3 Connection, read through an `inputs` entry
-* the kubauth client provisioning is removed, with the `oidc-client` module and the `oidc.clientProvisioning` and `oidc.kubauth` context keys: the OAuth client Secret `creds-<release>-oauth2` is always provided
+* the kubauth client provisioning is removed, with the `oidc-client` module and the `oidc.kubauth` context key: `oidc.clientProvisioning` is `existing` (the OAuth client Secret `creds-<release>-oauth2` is provided) or `dcr`
 
 ### Features
 
 * describe the package with contract 0.2
+* register the OAuth client through dynamic client registration when the platform provisions clients that way
+
+
+### Bug Fixes
+
+* stop reading `JUPYTERHUB_CRYPT_KEY` from the OAuth client Secret: the chart generates and keeps the auth state key, which overrode it
 
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/jupyterhub/v1.0.0...jupyterhub/v1.0.1) (2026-09-25)
 
