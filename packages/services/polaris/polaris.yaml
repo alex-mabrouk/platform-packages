@@ -257,7 +257,7 @@ modules:
           - "authorization_code"
           - "refresh_token"
         # openid is rejected by Keycloak here.
-        scope: {{ append (append (without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid") "roles") "offline_access" | join " " | quote }}
+        scope: {{ append (without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid") "offline_access" | join " " | quote }}
       tls:
         insecure: false
         certificate: "certs-bundle"
@@ -444,29 +444,28 @@ modules:
             name: {{ $oauthSecret }}
             key: client_secret
 
-        # Map polaris internal principal and roles with OIDC principal and roles
+        # Map polaris internal principal and roles with OIDC principal and groups
         principalMapper:
           type: default
           # You can use 'sub' as stable and immutable identity
           idClaimPath: ~
           nameClaimPath: "preferred_username"
-        # Mapped OIDC roles are visible, but they do not have the same effect as internal Polaris assignments.
+        # Mapped OIDC groups are visible, but they do not have the same effect as internal Polaris assignments.
         # Issue: https://github.com/apache/polaris/issues/2373
         # Polaris activates only the internal principal roles that are actually granted to that principal in Polaris RBAC
-        # Active Polaris roles = (mapped external roles) ∩ (principal roles granted in Polaris)
+        # Active Polaris roles = (mapped groups) ∩ (principal roles granted in Polaris)
         principalRolesMapper:
           type: default
-          rolesClaimPath: realm_access/roles
-          filter: "^(?!default-roles-.*|offline_access$|uma_authorization$).*$"
+          rolesClaimPath: groups
           mappings:
             # The rules are applied sequentially as ordered transforms
-            # Strip the "polaris_" prefix from admin roles and convert them to Polaris roles:
+            # Strip the "polaris_" prefix from admin groups and convert them to Polaris roles:
             # polaris_service_admin -> PRINCIPAL_ROLE:service_admin
             # polaris_catalog_admin -> PRINCIPAL_ROLE:catalog_admin
             # platform_admin -> PRINCIPAL_ROLE:platform_admin
             - regex: "^polaris_(.*)$"
               replacement: "PRINCIPAL_ROLE:$1"
-            # Fallback for normal roles, but do NOT touch values already prefixed by Polaris.
+            # Fallback for other groups, but do NOT touch values already prefixed by Polaris.
             - regex: "^(?!PRINCIPAL_ROLE:)(?!polaris_)(.*)$"
               replacement: "PRINCIPAL_ROLE:$1"
 
@@ -596,7 +595,7 @@ modules:
         VITE_OIDC_CLIENT_ID: "polaris-console"
         {{- end }}
         VITE_OIDC_REDIRECT_URI: "{{ $polarisEndpointConsoleUrl }}/auth/callback"
-        VITE_OIDC_SCOPE: "{{ .Context.oidc.scope | default "openid profile email groups" }} roles offline_access"
+        VITE_OIDC_SCOPE: "{{ .Context.oidc.scope | default "openid profile email groups" }} offline_access"
 
       {{- if $dcrConsole }}
       extraEnvVars:
