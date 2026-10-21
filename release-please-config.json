@@ -106,7 +106,10 @@
       "release-type": "simple",
       "include-component-in-tag": true,
       "tag-separator": "/",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "trino.yaml"
+      ]
     },
     "packages/system/okdp-control-plane-server": {
       "component": "okdp-control-plane-server",

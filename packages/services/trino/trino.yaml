@@ -14,15 +14,9 @@
 #  limitations under the License.
 #
 
-# Consumes hive and s3 Connections. Produces one trino Connection per
-# instance (kcd-<release>-endpoint).
 apiVersion: v1alpha1
 name: trino
-#tag: 480-p01
-# Currently, the UI requires the version to conform to SemVer (https://simversion.github.io/)
-# https://github.com/OKDP/okdp-ui/blob/main/src/app/shared/utils/utils.ts#L131
-tag: 480.0.0-1.0.1
-protected: false
+tag: 2.0.0 # x-release-please-version
 description: |
   Apache Trino - Distributed SQL query engine designed for large-scale data processing across multiple data sources.
   High-performance, in-memory query engine that enables fast, interactive analytics on diverse data systems.
@@ -31,45 +25,236 @@ usage:
   text: |
     Apache Trino provides distributed SQL query engine designed for large-scale data processing.
     Access the UI at https://trino-{{ .Release.spec.targetNamespace }}.{{ .Context.ingress.suffix }}
+# OKDP package descriptor (contract 0.2). Name and version are the name and tag
+# above. Its parameters are the single source of schema.parameters below.
+extensions:
+  okdp.io:
+    apiVersion: okdp.io/v1alpha1
+    kind: PackageDescriptor
+    appVersion: "480"
+    displayName: Trino
+    description: Distributed SQL engine of a project, federating its Hive and Iceberg catalogs
+    category: query
+    maturity: stable
+    edition: community
+    license: Apache-2.0
+    documentation: https://trino.io/docs/480/
+    maintainer: OKDP
+    keywords: [trino, sql, query]
+    capabilities:
+      - name: okdp.io/sql-query
+    dependencies:
+      - capability: okdp.io/ingress
+        providerScope: system-wide
+      - capability: okdp.io/certificate-manager
+        providerScope: system-wide
+      - capability: okdp.io/identity-provider
+        providerScope: system-wide
+      - capability: okdp.io/platform-tools
+        providerScope: system-wide
+      - capability: okdp.io/secrets-backend
+        providerScope: system-wide
+    compatibility:
+      kubernetes: ">=1.28.0"
+    parameters: &parameters
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      $defs:
+        catalogName:
+          type: string
+          pattern: "^[a-z][a-z0-9_-]*$"
+          description: "Trino catalog name."
+        secretName:
+          type: string
+          minLength: 1
+          x-okdp-secret-ref: true
+      properties:
+        hiveCatalogs:
+          type: array
+          title: Hive catalogs
+          description: "Hive catalogs, one Trino catalog per item, each on its own metastore and object store."
+          x-okdp-group: Catalogs
+          x-okdp-order: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, metastore, storage]
+            properties:
+              name: { $ref: "#/$defs/catalogName" }
+              metastore: { type: string, minLength: 1, description: "Name of the hive Connection backing this catalog.", x-okdp-connection: hive-metastore }
+              storage: { type: string, minLength: 1, description: "Name of the s3 Connection backing this catalog.", x-okdp-connection: hive-storage }
+              s3SecretRef: { $ref: "#/$defs/secretName", description: "S3 identity used against this store. Secret with keys: accessKey, secretKey. Defaults to the instance s3SecretRef." }
+        icebergCatalogs:
+          type: array
+          title: Iceberg REST catalogs
+          description: "Iceberg REST catalogs (Polaris), one Trino catalog per item, each on its own object store."
+          x-okdp-group: Catalogs
+          x-okdp-order: 2
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, catalog, storage, oidcSecretRef]
+            properties:
+              name: { $ref: "#/$defs/catalogName" }
+              catalog: { type: string, minLength: 1, description: "Name of the iceberg-catalog Connection.", x-okdp-connection: iceberg-catalog }
+              storage: { type: string, minLength: 1, description: "Name of the s3 Connection backing this catalog.", x-okdp-connection: iceberg-storage }
+              warehouse: { type: string, minLength: 1, description: "Polaris catalog used as the warehouse. Defaults to the realm published on the connection." }
+              oidcSecretRef: { $ref: "#/$defs/secretName", description: "Credentials of the Polaris principal Trino uses against this catalog. Secret with keys: client_id, client_secret." }
+              oauth2Scope: { type: string, minLength: 1, default: "PRINCIPAL_ROLE:ALL", description: "OAuth2 scope requested. Polaris rejects the connector default." }
+              s3SecretRef: { $ref: "#/$defs/secretName", description: "S3 identity used against this store. Secret with keys: accessKey, secretKey. Defaults to the instance s3SecretRef." }
+        s3SecretRef:
+          $ref: "#/$defs/secretName"
+          title: S3 credentials secret
+          description: "Default S3 identity of this instance, used by any catalog that does not name its own. Secret with keys: accessKey, secretKey."
+          x-okdp-group: Catalogs
+          x-okdp-order: 3
+        numWorkers:
+          type: integer
+          minimum: 0
+          default: 1
+          title: Workers
+          description: "Number of workers"
+          x-okdp-group: Sizing
+          x-okdp-order: 1
+          x-okdp-advanced: true
+        workerCpu:
+          type: number
+          default: 0.5
+          multipleOf: 0.25
+          title: Worker CPU (vCPU)
+          description: "Worker CPU request in vCPU."
+          x-okdp-group: Sizing
+          x-okdp-order: 2
+          x-okdp-advanced: true
+        workerMemoryGi:
+          type: number
+          default: 2
+          multipleOf: 0.25
+          title: Worker memory (GiB)
+          description: "Worker memory (GiB) used for Kubernetes requests/limits (recommended: request=limit)."
+          x-okdp-group: Sizing
+          x-okdp-order: 3
+          x-okdp-advanced: true
+        coordinatorMemoryGi:
+          type: number
+          default: 8
+          multipleOf: 0.25
+          title: Coordinator memory (GiB)
+          x-okdp-group: Sizing
+          x-okdp-order: 4
+          x-okdp-advanced: true
+        enableOPA:
+          type: boolean
+          default: true
+          title: Enable OPA
+          description: "Whether to enable OPA."
+          x-okdp-group: Authorization
+          x-okdp-order: 1
+        opaPolicyPath:
+          type: string
+          minLength: 1
+          default: "v1/data/trino/allow"
+          title: Policy path
+          description: "Path of the OPA policies for Trino used in the Trino variable opa.policy.uri. Used when enableOPA is true."
+          x-okdp-group: Authorization
+          x-okdp-order: 2
+          x-okdp-advanced: true
+        enableOPAL:
+          type: boolean
+          default: false
+          title: Enable OPAL
+          description: "Whether to enable OPAL. When false, OPA policies are loaded from labeled ConfigMaps by the kube-mgmt sidecar. Needs enableOPA."
+          x-okdp-group: Authorization
+          x-okdp-order: 3
+        policyRepoUrl:
+          type: string
+          default: "https://github.com/OKDP/okdp-examples.git"
+          title: Policy repository
+          description: "OPA policy repo URL. Used when enableOPAL is true."
+          x-okdp-group: Authorization
+          x-okdp-order: 4
+          x-okdp-advanced: true
+        policyRepoMainBranch:
+          type: string
+          default: "main"
+          title: Policy branch
+          description: "OPA policy repo branch. Used when enableOPAL is true."
+          x-okdp-group: Authorization
+          x-okdp-order: 5
+          x-okdp-advanced: true
+        OPAL_POLICY_SUBSCRIPTION_DIRS:
+          type: string
+          default: "trino_opa_policy"
+          title: Policy directories
+          description: "Policy directories in the repository for which the client will subscribe to, separated by ':'. Used when enableOPAL is true."
+          x-okdp-group: Authorization
+          x-okdp-order: 6
+          x-okdp-advanced: true
+        OPAL_POLICY_REPO_MANIFEST_PATH:
+          type: string
+          default: "trino_opa_policy"
+          title: Policy manifest path
+          description: "The location of the manifest file in the remote repository. Used when enableOPAL is true."
+          x-okdp-group: Authorization
+          x-okdp-order: 7
+          x-okdp-advanced: true
+        enableOPADebugLogs:
+          type: boolean
+          default: false
+          title: Debug logs
+          description: "Log OPA status and decision logs to the container console. Verbose, intended for debugging. Used when enableOPA is true."
+          x-okdp-group: Authorization
+          x-okdp-order: 8
+          x-okdp-advanced: true
+      if:
+        properties:
+          enableOPA: { const: false }
+        required: [enableOPA]
+      then:
+        properties:
+          enableOPAL: { const: false }
+    connections:
+      consumes:
+        - name: hive-metastore
+          contract: hive
+          version: "1"
+          description: Metastore of each Hive catalog
+        - name: hive-storage
+          contract: s3
+          version: "1"
+          description: Object store of each Hive catalog
+        - name: iceberg-catalog
+          contract: iceberg-catalog
+          version: "1"
+          description: Iceberg REST catalog of each Iceberg catalog
+        - name: iceberg-storage
+          contract: s3
+          version: "1"
+          description: Object store of each Iceberg catalog
+      publishes:
+        - name: endpoint
+          contract: trino
+          version: "1"
+          description: Trino endpoint and the catalogs it serves
+    endpoints:
+      - name: ui
+        kind: ui
+        protocol: http
+        authentication: oidc
+        description: Trino web UI and client protocol
+    sideEffects:
+      external:
+        - kind: identity-client
+          description: OIDC client registered through dynamic client registration when the platform provisions clients that way
+    lifecycle:
+      applyTimeout: 15m
+      rollback: supported
+    health:
+      http: { endpoint: ui, path: /v1/info }
+
 schema:
-  parameters:
-    properties:
-      hiveCatalogs:
-        title: "Catalogs | Hive catalogs | | order:1"
-        type: array
-        description: "Hive catalogs, one Trino catalog per item, each on its own metastore and object store."
-        items:
-          properties:
-            name: { type: string, required: true, description: "Trino catalog name." }
-            metastore: { type: connectionRef, contract: hive, required: true, description: "Hive metastore connection backing this catalog." }
-            storage: { type: connectionRef, contract: s3, required: true, description: "S3 object store connection backing this catalog." }
-            s3SecretRef: { type: string, description: "S3 identity used against this store. Secret with keys: accessKey, secretKey. Defaults to the instance s3SecretRef." }
-      icebergCatalogs:
-        title: "Catalogs | Iceberg REST catalogs | | order:2"
-        type: array
-        description: "Iceberg REST catalogs (Polaris), one Trino catalog per item, each on its own object store."
-        items:
-          properties:
-            name: { type: string, required: true, description: "Trino catalog name." }
-            catalog: { type: connectionRef, contract: iceberg-catalog, required: true, description: "Iceberg REST catalog connection." }
-            storage: { type: connectionRef, contract: s3, required: true, description: "S3 object store connection backing this catalog." }
-            warehouse: { type: string, description: "Polaris catalog used as the warehouse. Defaults to the realm published on the connection." }
-            oidcSecretRef: { type: string, description: "OAuth client Trino uses against this catalog. Secret with keys: client_id, client_secret. Defaults to creds-<release>-oauth2." }
-            oauth2Scope: { type: string, default: "PRINCIPAL_ROLE:ALL", description: "OAuth2 scope requested. Polaris rejects the connector default." }
-            s3SecretRef: { type: string, description: "S3 identity used against this store. Secret with keys: accessKey, secretKey. Defaults to the instance s3SecretRef." }
-      s3SecretRef: { title: "Catalogs | S3 credentials secret | | order:3", type: string, description: "Default S3 identity of this instance, used by any catalog that does not name its own. Secret with keys: accessKey, secretKey." }
-      numWorkers: { type: integer, default: 1, title: "Sizing | Workers | stepper | order:1 columns:2 advanced:true", description: "Number of workers" }
-      workerCpu: { type: number, default: 0.5, multipleOf: 0.25, title: "Sizing | Worker CPU (vCPU) | | order:2 columns:2 advanced:true", description: "Worker CPU request in vCPU." }
-      workerMemoryGi: { type: number, default: 2, multipleOf: 0.25, title: "Sizing | Worker memory (GiB) | | order:3 columns:2 advanced:true", description: "Worker memory (GiB) used for Kubernetes requests/limits (recommended: request=limit)." }
-      coordinatorMemoryGi: { type: number, default: 8, multipleOf: 0.25, title: "Sizing | Coordinator memory (GiB) | | order:4 columns:2 advanced:true" }
-      enableOPA: { title: "Authorization | Enable OPA | | order:1", type: boolean, default: true, description: "Whether to enable OPA." }
-      enableOPAL: { title: "Authorization | Enable OPAL | | order:3 condition:enableOPA=true", type: boolean, default: false, description: "Whether to enable OPAL. When false, OPA policies are loaded from labeled ConfigMaps by the kube-mgmt sidecar." }
-      enableOPADebugLogs: { title: "Authorization | Debug logs | | order:8 advanced:true condition:enableOPA=true", type: boolean, default: false, description: "Log OPA status and decision logs to the container console. Verbose, intended for debugging." }
-      policyRepoUrl: { title: "Authorization | Policy repository | | order:4 advanced:true condition:enableOPAL=true", type: string, default: "https://github.com/OKDP/okdp-examples.git", description: "OPA policy repo URL" }
-      policyRepoMainBranch: { title: "Authorization | Policy branch | | order:5 columns:2 advanced:true condition:enableOPAL=true", type: string, default: "main", description: "OPA policy repo branch." }
-      OPAL_POLICY_SUBSCRIPTION_DIRS: { title: "Authorization | Policy directories | | order:6 advanced:true condition:enableOPAL=true",type: string, default: "trino_opa_policy", description: "Policy directories in the repository for which the client will subscribe to, separated by ':'."}
-      OPAL_POLICY_REPO_MANIFEST_PATH: { title: "Authorization | Policy manifest path | | order:7 advanced:true condition:enableOPAL=true", type: string, default: "trino_opa_policy", description: "The location of the manifest file in the remote repository."}
-      opaPolicyPath: { title: "Authorization | Policy path | | order:2 advanced:true condition:enableOPA=true",type: string, default: "v1/data/trino/allow", description: "Path of the OPA policies for Trino used in the Trino variable opa.policy.uri."}
+  parameters: *parameters
   context:
     properties:
       certificateIssuers:
@@ -91,12 +276,19 @@ schema:
           tokenUrl: { type: string, required: true }
           jwksUri: { type: string, required: true }
           scope: { type: string, default: "openid profile email groups" }
-          clientProvisioning: { type: string, default: existing }
+          clientProvisioning: { type: string, default: dcr }
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
               registrationUrl: { type: string }
               authMethod: { type: string }
+
+
+inputs:
+  - { contract: hive, alias: hive-metastore, fromParameter: "hiveCatalogs[].metastore" }
+  - { contract: s3, alias: hive-storage, fromParameter: "hiveCatalogs[].storage" }
+  - { contract: iceberg-catalog, alias: iceberg-catalog, fromParameter: "icebergCatalogs[].catalog" }
+  - { contract: s3, alias: iceberg-storage, fromParameter: "icebergCatalogs[].storage" }
 
 modules:
   - name: internal-secrets
@@ -215,7 +407,7 @@ modules:
           {{- end }}
 
   - name: oidc-dcr
-    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}'
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
@@ -228,7 +420,7 @@ modules:
 
       {{- $oidcIssuerUri := .Context.oidc.issuerUri -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "existing") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
       {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
       {{- end }}
       {{- $oidcRegistrationUrl := $dcr.registrationUrl -}}
@@ -278,7 +470,7 @@ modules:
 
       {{- $oidcScopes := (.Context.oidc.scope | default "openid profile email groups") | replace " " "," -}}
       {{- $oauthSecret := printf "creds-%s-oauth2" $release -}}
-      {{- $enableDCR := eq (.Context.oidc.clientProvisioning | default "existing") "dcr" -}}
+      {{- $enableDCR := eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" -}}
 
       {{- $trinoEndpoint := printf "trino-%s.%s" $namespace $domain -}}
 
@@ -292,34 +484,38 @@ modules:
 
       {{- if or $hiveCatalogs $icebergCatalogs }}
       catalogs:
-        {{- range $c := $hiveCatalogs }}
+        {{- range $i, $c := $hiveCatalogs }}
         {{- $envPrefix := upper (replace "-" "_" $c.name) }}
+        {{- $metastore := index $.InputLists "hive-metastore" $i }}
+        {{- $storage := index $.InputLists "hive-storage" $i }}
         {{ $c.name }}: |
           connector.name=hive
-          hive.metastore.uri={{ $c.metastore.thriftUri }}
+          hive.metastore.uri={{ $metastore.thriftUri }}
           fs.native-s3.enabled=true
-          s3.endpoint={{ $c.storage.apiUrl }}
-          s3.path-style-access={{ $c.storage.pathStyle | default false }}
-          s3.region={{ $c.storage.region }}
+          s3.endpoint={{ $storage.apiUrl }}
+          s3.path-style-access={{ $storage.pathStyle | default false }}
+          s3.region={{ $storage.region }}
           s3.aws-access-key=${ENV:S3_ACCESS_KEY_{{ $envPrefix }}}
           s3.aws-secret-key=${ENV:S3_SECRET_ACCESS_{{ $envPrefix }}}
         {{- end }}
-        {{- range $ic := $icebergCatalogs }}
+        {{- range $i, $ic := $icebergCatalogs }}
         {{- $envPrefix := upper (replace "-" "_" $ic.name) }}
+        {{- $catalog := index $.InputLists "iceberg-catalog" $i }}
+        {{- $storage := index $.InputLists "iceberg-storage" $i }}
         {{ $ic.name }}: |
           connector.name=iceberg
           iceberg.catalog.type=rest
-          iceberg.rest-catalog.uri={{ $ic.catalog.internalUri | default $ic.catalog.uri }}
-          iceberg.rest-catalog.warehouse={{ $ic.warehouse | default $ic.catalog.realm }}
+          iceberg.rest-catalog.uri={{ $catalog.internalUri | default $catalog.uri }}
+          iceberg.rest-catalog.warehouse={{ $ic.warehouse | default $catalog.realm }}
           iceberg.rest-catalog.security=OAUTH2
           iceberg.rest-catalog.oauth2.credential=${ENV:ICEBERG_OAUTH_{{ $envPrefix }}}
           iceberg.rest-catalog.oauth2.scope={{ $ic.oauth2Scope | default "PRINCIPAL_ROLE:ALL" }}
-          iceberg.rest-catalog.oauth2.server-uri={{ $ic.catalog.internalUri | default $ic.catalog.uri }}/v1/oauth/tokens
+          iceberg.rest-catalog.oauth2.server-uri={{ $catalog.internalUri | default $catalog.uri }}/v1/oauth/tokens
           iceberg.rest-catalog.vended-credentials-enabled=false
           fs.native-s3.enabled=true
-          s3.endpoint={{ $ic.storage.apiUrl }}
-          s3.path-style-access={{ $ic.storage.pathStyle | default false }}
-          s3.region={{ $ic.storage.region }}
+          s3.endpoint={{ $storage.apiUrl }}
+          s3.path-style-access={{ $storage.pathStyle | default false }}
+          s3.region={{ $storage.region }}
           s3.aws-access-key=${ENV:S3_ACCESS_KEY_{{ $envPrefix }}}
           s3.aws-secret-key=${ENV:S3_SECRET_ACCESS_{{ $envPrefix }}}
         {{- end }}
@@ -353,12 +549,12 @@ modules:
         - name: ICEBERG_OAUTH_CLIENT_ID_{{ $envPrefix }}
           valueFrom:
             secretKeyRef:
-              name: {{ $ic.oidcSecretRef | default $oauthSecret }}
+              name: {{ $ic.oidcSecretRef }}
               key: client_id
         - name: ICEBERG_OAUTH_CLIENT_SECRET_{{ $envPrefix }}
           valueFrom:
             secretKeyRef:
-              name: {{ $ic.oidcSecretRef | default $oauthSecret }}
+              name: {{ $ic.oidcSecretRef }}
               key: client_secret
         # Kubernetes expands $(VAR) from variables declared earlier in this list.
         - name: ICEBERG_OAUTH_{{ $envPrefix }}
@@ -523,7 +719,10 @@ outputs: |
         - "{{ $c.name }}"
         {{- end }}
 roles:
-  - interactive-query
+  - okdp.io/sql-query
 dependencies:
-  - data-catalog
-  - ingress
+  - okdp.io/ingress
+  - okdp.io/certificate-manager
+  - okdp.io/identity-provider
+  - okdp.io/platform-tools
+  - okdp.io/secrets-backend
