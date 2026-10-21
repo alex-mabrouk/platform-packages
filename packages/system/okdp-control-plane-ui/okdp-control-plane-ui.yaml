@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: okdp-control-plane-ui
-tag: 2.0.0 # x-release-please-version
+tag: 2.0.0-alpha.1 # x-release-please-version
 description: |
   OKDP UI - Frontend web interface for the Open Kubernetes Data Platform
 usage:
@@ -98,22 +98,14 @@ extensions:
           title: OIDC client ID
           x-okdp-group: Authentication
           x-okdp-order: 2
-        rolesClaim:
-          type: string
-          minLength: 1
-          default: "groups"
-          title: Roles claim
-          description: "Claim of the ID token carrying the caller's roles. Dotted paths are resolved. Keycloak keeps realm_access out of the ID token, hence groups."
-          x-okdp-group: Authentication
-          x-okdp-order: 3
-        adminRole:
+        adminGroup:
           type: string
           minLength: 1
           default: "platform_admin"
-          title: Admin role
-          description: "Role that opens the administration screens."
+          title: Admin group
+          description: "Group that opens the administration screens, matched against the groups claim."
           x-okdp-group: Authentication
-          x-okdp-order: 4
+          x-okdp-order: 3
         backendService:
           type: string
           minLength: 1
@@ -183,8 +175,8 @@ modules:
         clientId: {{ .Parameters.oidcClientId | quote }}
 
       identity:
-        rolesClaim: {{ .Parameters.rolesClaim | quote }}
-        adminRole: {{ .Parameters.adminRole | quote }}
+        rolesClaim: groups
+        adminRole: {{ .Parameters.adminGroup | quote }}
 
       ingress:
         className: {{ .Context.ingress.className }}

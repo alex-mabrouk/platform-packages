@@ -9,7 +9,7 @@
 * the parameters are a closed JSON Schema: an unknown parameter is refused
 * the role `spark` is renamed `okdp.io/spark-history`; the dependencies are `okdp.io/ingress`, `okdp.io/certificate-manager`, `okdp.io/identity-provider`, `okdp.io/platform-tools` and `okdp.io/secrets-backend`, the object store is a connection
 * `storage` is a plain string naming the s3 Connection, read through an `inputs` entry
-* `roleMapping` accepts only `admin_groups`, `history_admin_groups`, `modify_groups` and `view_groups`
+* `roleMapping` is replaced by `access`: `admin`, `historyAdmin`, `modify` and `view` list the groups granted each Spark ACL
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
 
 ### Features

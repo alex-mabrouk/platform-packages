@@ -11,6 +11,7 @@
 * the roles `data-catalog` and `iceberg-catalog` are renamed `okdp.io/data-catalog` and `okdp.io/iceberg-catalog`; the dependencies are `okdp.io/ingress`, `okdp.io/certificate-manager`, `okdp.io/identity-provider`, `okdp.io/platform-tools` and `okdp.io/secrets-backend`, the database and the object store are connections
 * `db` and `storage` are plain strings naming the database-server and s3 Connections, read through `inputs` entries
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers the server and console clients unless the platform Context says `existing`
+* the principal roles are mapped from the `groups` claim instead of `realm_access/roles`; the `roles` scope is no longer requested
 
 ### Features
 

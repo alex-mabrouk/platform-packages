@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: spark-history-server
-tag: 2.0.0 # x-release-please-version
+tag: 2.0.0-alpha.1 # x-release-please-version
 description: |
   Spark History Server - Monitoring and debugging interface for Apache Spark applications.
   Provides detailed execution metrics, job timelines, and performance insights for completed Spark jobs.
@@ -64,7 +64,7 @@ extensions:
       $defs:
         groups:
           type: array
-          items: { type: string }
+          items: { type: string, minLength: 1 }
       properties:
         cpu:
           type: number
@@ -100,19 +100,18 @@ extensions:
           x-okdp-group: Storage
           x-okdp-order: 2
           x-okdp-secret-ref: true
-        roleMapping:
+        access:
           type: object
           additionalProperties: false
-          title: Role mapping
-          description: "OIDC group to Spark ACL mapping."
+          title: Access
+          description: "Groups granted each Spark ACL, matched against the groups claim."
           x-okdp-group: Authentication
           x-okdp-order: 4
-          x-okdp-advanced: true
           properties:
-            admin_groups: { $ref: "#/$defs/groups" }
-            history_admin_groups: { $ref: "#/$defs/groups" }
-            modify_groups: { $ref: "#/$defs/groups" }
-            view_groups: { $ref: "#/$defs/groups" }
+            admin: { $ref: "#/$defs/groups" }
+            historyAdmin: { $ref: "#/$defs/groups" }
+            modify: { $ref: "#/$defs/groups" }
+            view: { $ref: "#/$defs/groups" }
     connections:
       consumes:
         - name: storage
@@ -233,14 +232,11 @@ modules:
 
       {{- $oidcIssuerUri := .Context.oidc.issuerUri -}}
       {{- $oidcEnabled := .Context.oidc.enabled | default false -}}
-      {{- $oidcRoleMapping := .Parameters.roleMapping | default dict -}}
-      {{- if not (kindIs "map" $oidcRoleMapping) }}
-        {{- fail "parameters.roleMapping must be a map" -}}
-      {{- end }}
-      {{- $adminGroups := get $oidcRoleMapping "admin_groups" | default list -}}
-      {{- $historyAdminGroups := get $oidcRoleMapping "history_admin_groups" | default list -}}
-      {{- $modifyGroups := get $oidcRoleMapping "modify_groups" | default list -}}
-      {{- $viewGroups := get $oidcRoleMapping "view_groups" | default list -}}
+      {{- $access := .Parameters.access | default dict -}}
+      {{- $adminGroups := $access.admin | default list -}}
+      {{- $historyAdminGroups := $access.historyAdmin | default list -}}
+      {{- $modifyGroups := $access.modify | default list -}}
+      {{- $viewGroups := $access.view | default list -}}
 
       {{- $storageApiUrl := .Inputs.storage.internalUrl | default .Inputs.storage.apiUrl -}}
 

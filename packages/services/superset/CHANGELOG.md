@@ -9,7 +9,7 @@
 * the parameters are a closed JSON Schema: an unknown parameter is refused
 * the role `dataviz` is renamed `okdp.io/bi`; the dependencies are `okdp.io/ingress`, `okdp.io/certificate-manager`, `okdp.io/identity-provider`, `okdp.io/platform-tools` and `okdp.io/secrets-backend`, the databases and the Trino instances are connections
 * `metadataDb`, `examplesDb` and `datasources[].trino` are plain strings naming Connections, read through `inputs` entries
-* `oidcRoleMapping` values are lists of role names
+* `oidcRoleMapping` is replaced by `access`, the groups granted each Superset role
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
 
 ### Features

@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: jupyterhub
-tag: 2.0.0 # x-release-please-version
+tag: 2.0.0-alpha.1 # x-release-please-version
 description: |
   JupyterHub - Multi-user interactive development environment for data science and machine learning.
   Provides secure, scalable Jupyter notebook access with integrated authentication, resource management,
@@ -115,15 +115,16 @@ extensions:
             properties:
               name: { type: string, minLength: 1 }
               uri: { type: string, minLength: 1 }
-        oidcRoleMapping:
+        access:
           type: object
-          additionalProperties: true
-          title: Role mapping
-          description: "Optional GenericOAuthenticator overrides (claim_groups_key, allowed_groups, admin_groups, ...)"
+          additionalProperties: false
+          title: Access
+          description: "Groups allowed to sign in (users) and made JupyterHub admins (admins), matched against the groups claim."
+          properties:
+            users: { type: array, items: { type: string, minLength: 1 } }
+            admins: { type: array, items: { type: string, minLength: 1 } }
           x-okdp-group: Authentication
           x-okdp-order: 3
-          x-okdp-advanced: true
-          x-okdp-widget: yaml
         # PySpark connections: each item carries its final spark conf lines
         # (properties) and optionally its own S3 identity (keys accessKey/secretKey).
         # pyspark lists the connection names to enable.
@@ -292,7 +293,7 @@ modules:
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $domain := printf "%v" .Context.ingress.suffix -}}
 
-      {{- $oidcRoleMapping := .Parameters.oidcRoleMapping | default dict -}}
+      {{- $access := .Parameters.access | default dict -}}
 
       {{- $oidcName := .Context.oidc.displayName | default "keycloak" -}}
 
@@ -390,8 +391,11 @@ modules:
             manage_groups: true
             userdata_params:
               state: state
-            {{- if gt (len $oidcRoleMapping) 0 }}
-            {{- toYaml $oidcRoleMapping | nindent 6 }}
+            {{- with $access.users }}
+            allowed_groups: {{ toJson . }}
+            {{- end }}
+            {{- with $access.admins }}
+            admin_groups: {{ toJson . }}
             {{- end }}
             username_key: preferred_username
             scope:
