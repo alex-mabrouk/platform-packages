@@ -1,8 +1,8 @@
 apiVersion: v1alpha1
 name: airflow
-tag: 2.0.0-alpha.2 # x-release-please-version
+tag: 2.0.0-alpha.3 # x-release-please-version
 description: |
-  Apache Airflow 3.2.1 - Workflow orchestration platform with Spark Operator integration
+  Apache Airflow 3.2.2 - Workflow orchestration platform with Spark Operator integration
 
 usage:
   text: |
@@ -19,14 +19,14 @@ extensions:
   okdp.io:
     apiVersion: okdp.io/v1alpha1
     kind: PackageDescriptor
-    appVersion: 3.2.1
+    appVersion: 3.2.2
     displayName: Apache Airflow
     description: Scheduling and running the data pipelines of a project, with the Kubernetes executor
     category: orchestration
     maturity: stable
     edition: community
     license: Apache-2.0
-    documentation: https://airflow.apache.org/docs/apache-airflow/3.2.1/
+    documentation: https://airflow.apache.org/docs/apache-airflow/3.2.2/
     maintainer: OKDP
     keywords: [airflow, workflow, dag]
     capabilities:
@@ -268,12 +268,12 @@ modules:
       helmRepository:
         url: https://airflow.apache.org
         chart: airflow
-        version: 1.21.0
+        version: 1.22.0
     values: |
       executor: "KubernetesExecutor"
 
-      defaultAirflowTag: "3.2.1"
-      airflowVersion: "3.2.1"
+      defaultAirflowTag: "3.2.2"
+      airflowVersion: "3.2.2"
 
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}

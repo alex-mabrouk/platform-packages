@@ -15,6 +15,7 @@
 ### Features
 
 * describe the package with contract 0.2
+* Apache Airflow 3.2.2, chart 1.22.0
 
 ### Bug Fixes
 
