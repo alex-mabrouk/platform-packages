@@ -18,6 +18,7 @@
 * **polaris:** one realm, its principals, a generated root account ([b48c912](https://github.com/OKDP/platform-packages/commit/b48c9124eeccd5dc63e5046214261cc0372efda0))
 * describe the package with contract 0.2
 * register the server client and the public console client through dynamic client registration; the console reads its client id from a Secret, with the polaris-console chart 0.2.1
+* Apache Polaris 1.8.0; the database schema is created before the bootstrap, which no longer does it
 
 
 ### Bug Fixes
