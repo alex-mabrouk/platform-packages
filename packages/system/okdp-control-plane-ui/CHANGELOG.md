@@ -8,6 +8,7 @@
 * the package version no longer embeds the upstream version: the tag is `2.0.0`, the upstream version is `appVersion` in the descriptor
 * the parameters are a closed JSON Schema: an unknown parameter is refused
 * the role `okdp-ui` is renamed `okdp.io/ui`; the dependencies `okdp-server` and `ingress` become `okdp.io/control-plane` and `okdp.io/ingress`, plus `okdp.io/certificate-manager` and `okdp.io/identity-provider`
+* `rolesClaim` is removed, the console reads the `groups` claim; `adminRole` is renamed `adminGroup`
 
 ### Features
 
