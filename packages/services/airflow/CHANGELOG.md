@@ -20,6 +20,7 @@
 ### Bug Fixes
 
 * restart the API server when its configuration changes, so a new `access` takes effect
+* drop the API server checksum annotation added for that, chart 1.22.0 sets it itself
 
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/airflow/v1.0.0...airflow/v1.0.1) (2026-09-25)
 
