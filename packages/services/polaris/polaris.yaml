@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: polaris
-tag: 2.0.0 # x-release-please-version
+tag: 2.0.0-alpha.1 # x-release-please-version
 description: |
   Apache Polaris is an open-source, fully-featured catalog for Apache Iceberg™.
 usage:

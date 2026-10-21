@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: hive-metastore
-tag: 2.0.0 # x-release-please-version
+tag: 2.0.0-alpha.1 # x-release-please-version
 description: |
   Hive Metastore is a centralized metadata repository for data lakes and big data analytics.
   Stores and manages table schemas, partition information, and data locations for engines like Apache Hive, Spark, and Trino.

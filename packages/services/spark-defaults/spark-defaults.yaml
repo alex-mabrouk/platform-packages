@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: spark-defaults
-tag: 2.0.0 # x-release-please-version
+tag: 2.0.0-alpha.1 # x-release-please-version
 description: |
   Helm chart that provisions the spark default properties.
 usage:

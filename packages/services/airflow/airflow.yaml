@@ -1,6 +1,6 @@
 apiVersion: v1alpha1
 name: airflow
-tag: 2.0.0 # x-release-please-version
+tag: 2.0.0-alpha.1 # x-release-please-version
 description: |
   Apache Airflow 3.2.1 - Workflow orchestration platform with Spark Operator integration
 
