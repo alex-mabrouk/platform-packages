@@ -145,16 +145,18 @@ extensions:
           x-okdp-group: Sizing
           x-okdp-order: 3
           x-okdp-advanced: true
-        oidcRoleMapping:
+        access:
           type: object
-          additionalProperties:
-            type: array
-            items: { type: string }
-          title: Role mapping
-          description: "Map of OIDC roles to lists of Superset roles."
+          additionalProperties: false
+          title: Access
+          description: "Groups granted each Superset role, matched against the groups claim."
+          properties:
+            Admin: { type: array, items: { type: string, minLength: 1 } }
+            Alpha: { type: array, items: { type: string, minLength: 1 } }
+            Gamma: { type: array, items: { type: string, minLength: 1 } }
+            sql_lab: { type: array, items: { type: string, minLength: 1 } }
           x-okdp-group: Authentication
           x-okdp-order: 6
-          x-okdp-advanced: true
         # Each datasource wires its own Trino connection and catalog. The name is
         # the display name in the Superset UI.
         datasources:
@@ -365,7 +367,10 @@ modules:
       {{- /* The oidc connection resolved from the platform context */ -}}
       {{- $oidcBaseUrl := printf "%s/protocol/openid-connect" .Context.oidc.issuerUri -}}
 
-      {{- $supersetOidcRoleMapping := .Parameters.oidcRoleMapping | default dict }}
+      {{- $supersetGroupRoles := dict }}
+      {{- range $role, $groups := (.Parameters.access | default dict) }}
+      {{- range $groups }}{{ $_ := set $supersetGroupRoles . (append (get $supersetGroupRoles . | default list) $role) }}{{ end }}
+      {{- end }}
 
       {{- $supersetHost := printf "superset-%s.%s" $namespace $domain -}}
 
@@ -498,8 +503,8 @@ modules:
             AUTH_ROLES_SYNC_AT_LOGIN = True
           oauth2_superset_roles_mapping: &oauth2_superset_roles_mapping |
             AUTH_ROLES_MAPPING = {
-            {{- range $oidcRole, $supersetRoles := $supersetOidcRoleMapping }}
-              {{ $oidcRole | quote }}: {{ $supersetRoles | toJson }},
+            {{- range $group, $supersetRoles := $supersetGroupRoles }}
+              {{ $group | quote }}: {{ $supersetRoles | toJson }},
             {{- end }}
             }
 
