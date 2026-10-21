@@ -194,7 +194,7 @@ schema:
           enabled: { type: boolean, default: true }
           scope: { type: string, default: "openid profile email groups" }
           insecureSkipVerify: { type: boolean, default: false }
-          clientProvisioning: { type: string, default: existing }
+          clientProvisioning: { type: string, default: dcr }
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
@@ -210,7 +210,7 @@ modules:
   # Active only when the platform provisions clients that way; the credentials
   # land in a Secret carrying the same keys the deployment reads.
   - name: oidc-dcr
-    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}'
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
@@ -220,7 +220,7 @@ modules:
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "existing") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
       {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
       {{- end }}
 
@@ -290,7 +290,7 @@ modules:
       {{- if hasKey .Context.oidc "enabled" }}{{- $airflowOidcEnabled = .Context.oidc.enabled }}{{ end }}
       {{- /* offline_access here must stay registered by the oidc-dcr module above. */}}
       {{- $airflowOidcScope := printf "%s offline_access" (.Context.oidc.scope | default "openid profile email groups") | replace " " "+" }}
-      {{- $airflowDCR := eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}
+      {{- $airflowDCR := eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
       {{- /* In dcr mode the registration job writes the credentials, under the same keys. */}}
       {{- $airflowOauthSecret := printf "creds-%s-oauth2" .Release.metadata.name }}
       {{- if $airflowDCR }}{{- $airflowOauthSecret = printf "%s-%s-dcr" .Release.metadata.name .Release.spec.targetNamespace }}{{- end }}

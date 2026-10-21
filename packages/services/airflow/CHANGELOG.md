@@ -10,6 +10,7 @@
 * the role `airflow` is renamed `okdp.io/workflow-orchestration`; the dependencies are `okdp.io/ingress`, `okdp.io/certificate-manager`, `okdp.io/identity-provider`, `okdp.io/platform-tools` and `okdp.io/secrets-backend`, the database and the object store are connections
 * `db` and `storage` are plain strings naming the database-server and s3 Connections, read through `inputs` entries
 * `oidcRoleMapping` values are lists of role names, `dagsGitSync.credentialsSecret` needs a `name`
+* `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
 
 ### Features
 
