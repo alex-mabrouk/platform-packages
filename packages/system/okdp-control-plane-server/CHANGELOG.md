@@ -13,6 +13,7 @@
 ### Features
 
 * describe the package with contract 0.2
+* OKDP Control Plane Server 0.10.0
 
 ## [1.1.0](https://github.com/OKDP/platform-packages/compare/okdp-control-plane-server/v1.0.1...okdp-control-plane-server/v1.1.0) (2026-10-05)
 
