@@ -100,16 +100,18 @@ extensions:
           x-okdp-group: Sizing
           x-okdp-order: 4
           x-okdp-advanced: true
-        oidcRoleMapping:
+        access:
           type: object
-          additionalProperties:
-            type: array
-            items: { type: string }
-          title: Role mapping
-          description: "Map of OIDC groups to lists of Airflow roles."
+          additionalProperties: false
+          title: Access
+          description: "Groups granted each Airflow role, matched against the groups claim."
+          properties:
+            Admin: { type: array, items: { type: string, minLength: 1 } }
+            Op: { type: array, items: { type: string, minLength: 1 } }
+            User: { type: array, items: { type: string, minLength: 1 } }
+            Viewer: { type: array, items: { type: string, minLength: 1 } }
           x-okdp-group: Authentication
           x-okdp-order: 4
-          x-okdp-advanced: true
         storage:
           type: string
           minLength: 1
@@ -294,7 +296,10 @@ modules:
       {{- /* In dcr mode the registration job writes the credentials, under the same keys. */}}
       {{- $airflowOauthSecret := printf "creds-%s-oauth2" .Release.metadata.name }}
       {{- if $airflowDCR }}{{- $airflowOauthSecret = printf "%s-%s-dcr" .Release.metadata.name .Release.spec.targetNamespace }}{{- end }}
-      {{- $airflowOidcRoleMapping := .Parameters.oidcRoleMapping | default dict }}
+      {{- $airflowGroupRoles := dict }}
+      {{- range $role, $groups := (.Parameters.access | default dict) }}
+      {{- range $groups }}{{ $_ := set $airflowGroupRoles . (append (get $airflowGroupRoles . | default list) $role) }}{{ end }}
+      {{- end }}
       {{- $airflowOidcBaseUrl := "" }}
       {{- $airflowOidcAuthUrl := "" }}
       {{- $airflowOidcTokenUrl := "" }}
@@ -391,8 +396,8 @@ modules:
           AUTH_ROLES_SYNC_AT_LOGIN = True
           # Map OIDC groups to Airflow roles
           AUTH_ROLES_MAPPING = {
-          {{- range $oidcRole, $airflowRoles := $airflowOidcRoleMapping }}
-              {{ $oidcRole | quote }}: {{ $airflowRoles | toJson }},
+          {{- range $group, $airflowRoles := $airflowGroupRoles }}
+              {{ $group | quote }}: {{ $airflowRoles | toJson }},
           {{- end }}
           }
 
