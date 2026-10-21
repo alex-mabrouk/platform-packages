@@ -213,7 +213,7 @@ schema:
           userinfoUrl: { type: string, required: true }
           displayName: { type: string, default: keycloak }
           scope: { type: string, default: "openid profile email groups" }
-          clientProvisioning: { type: string, default: existing }
+          clientProvisioning: { type: string, default: dcr }
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
@@ -228,7 +228,7 @@ modules:
   # Active only when the platform provisions clients that way; the credentials
   # land in a Secret carrying the same keys the deployment reads.
   - name: oidc-dcr
-    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}'
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
@@ -238,7 +238,7 @@ modules:
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "existing") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
       {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
       {{- end }}
 
@@ -335,7 +335,7 @@ modules:
       {{- end }}
 
       {{- $oidcSecret := printf "creds-%s-oauth2" .Release.metadata.name -}}
-      {{- if eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}{{- $oidcSecret = printf "%s-%s-dcr" .Release.metadata.name .Release.spec.targetNamespace }}{{- end }}
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}{{- $oidcSecret = printf "%s-%s-dcr" .Release.metadata.name .Release.spec.targetNamespace }}{{- end }}
       # Fix resource naming conflicts by using release name as prefix
       fullnameOverride: "{{ .Release.metadata.name }}"
       nameOverride: "{{ .Release.metadata.name }}"
