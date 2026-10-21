@@ -16,7 +16,7 @@ It is **packages-only**: it owns the package definitions under `packages/`, the 
 ## KuboCD Concepts
 
 - **Package**: a versioned OCI artifact that bundles a KuboCD application descriptor and one or more Helm charts. The manifests under `packages/` define the packages published by this repository.
-- **Connection**: a typed endpoint identified by a contract. A package consumes one through a `connectionRef` parameter and publishes one through `outputs`. The contracts used here are `s3`, `database-server`, `hive`, `iceberg-catalog` and `trino`.
+- **Connection**: a typed endpoint identified by a contract. A package consumes one through an `inputs` entry, whose name is a parameter, and publishes one through `outputs`. The contracts used here are `s3`, `database-server`, `hive`, `iceberg-catalog` and `trino`.
 
 Packages are deployed through KuboCD **Releases** that reference layered **Contexts**. Those deployment resources are maintained in [`OKDP/okdp-sandbox`](https://github.com/OKDP/okdp-sandbox), not here.
 
@@ -55,6 +55,8 @@ Key paths:
 
 The OCI repository packages are published to is defined once in [`platform-packages-values.yaml`](./platform-packages-values.yaml) (`packageRepository`). Use the same value for local builds.
 
+A package carrying an OKDP descriptor (`extensions.okdp.io`) is built by [`kubocd-package.sh`](./.github/scripts/kubocd-package.sh), which checks it with `okdp-contract` and publishes the descriptor as the artifact config.
+
 ### Basic Build Command
 
 ```bash
@@ -91,7 +93,7 @@ kubocd package ./packages/services/jupyterhub/jupyterhub.yaml --ociRepoPrefix qu
 
 Packages are pushed to: `{ociRepoPrefix}/{package-name}:{tag}`
 
-Example: `quay.io/okdp/platform-packages/superset:6.0.0-p02`
+Example: `quay.io/okdp/platform-packages/superset:2.0.0`
 
 ## GitHub CI and Publishing
 
