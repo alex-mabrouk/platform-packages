@@ -1,0 +1,8 @@
+apiVersion: v2
+name: postgres-schema
+description: >-
+  Creates a schema in a PostgreSQL database before the service that uses it
+  starts, with the credentials of the database owner. Idempotent: an existing
+  schema is left untouched.
+type: application
+version: 0.1.0
