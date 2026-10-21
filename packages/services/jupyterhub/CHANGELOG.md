@@ -11,6 +11,7 @@
 * `storage` is a plain string naming the s3 Connection, read through an `inputs` entry
 * the kubauth client provisioning is removed, with the `oidc-client` module and the `oidc.kubauth` context key: `oidc.clientProvisioning` is `existing` (the OAuth client Secret `creds-<release>-oauth2` is provided) or `dcr`
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
+* `oidcRoleMapping` is replaced by `access`: `users` and `admins` list the groups allowed to sign in and made admins
 
 ### Features
 
