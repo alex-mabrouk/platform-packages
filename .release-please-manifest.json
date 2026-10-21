@@ -9,7 +9,7 @@
   "packages/services/spark-operator": "2.0.0-alpha.1",
   "packages/services/spark-rbac": "2.0.0-alpha.1",
   "packages/services/superset": "2.0.0-alpha.1",
-  "packages/services/trino": "2.0.0-alpha.1",
+  "packages/services/trino": "2.0.0-alpha.2",
   "packages/system/okdp-control-plane-server": "2.0.0-alpha.1",
   "packages/system/okdp-control-plane-ui": "2.0.0-alpha.1"
 }
