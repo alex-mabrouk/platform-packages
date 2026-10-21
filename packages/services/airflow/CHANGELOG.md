@@ -16,6 +16,10 @@
 
 * describe the package with contract 0.2
 
+### Bug Fixes
+
+* restart the API server when its configuration changes, so a new `access` takes effect
+
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/airflow/v1.0.0...airflow/v1.0.1) (2026-09-25)
 
 

@@ -1,6 +1,6 @@
 apiVersion: v1alpha1
 name: airflow
-tag: 2.0.0-alpha.1 # x-release-please-version
+tag: 2.0.0-alpha.2 # x-release-please-version
 description: |
   Apache Airflow 3.2.1 - Workflow orchestration platform with Spark Operator integration
 
@@ -370,6 +370,9 @@ modules:
           mountPath: /cacerts
 
       apiServer:
+        # The chart does not roll the API server when apiServerConfig changes.
+        podAnnotations:
+          checksum/api-server-config: '{{ "{{" }} include (print $.Template.BasePath "/configmaps/api-server-configmap.yaml") . | sha256sum {{ "}}" }}'
         resources:
           requests:
             memory: "384Mi"
