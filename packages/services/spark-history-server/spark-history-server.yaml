@@ -125,6 +125,10 @@ extensions:
         protocol: http
         authentication: oidc
         description: History and live Spark UIs, through the web proxy
+    sideEffects:
+      external:
+        - kind: identity-client
+          description: OIDC client registered through dynamic client registration when the platform provisions clients that way
     lifecycle:
       applyTimeout: 15m
       rollback: supported
@@ -152,11 +156,57 @@ schema:
           issuerUri: { type: string, required: true }
           scope: { type: string, default: "openid profile email groups" }
           usePKCE: { type: boolean, default: true }
+          clientProvisioning: { type: string, default: existing }
+          # Read only when clientProvisioning is dcr.
+          dcr:
+            properties:
+              registrationUrl: { type: string }
+              authMethod: { type: string }
 
 inputs:
   - { contract: s3, alias: storage, fromParameter: storage }
 
 modules:
+  # Registers the OIDC client through anonymous Dynamic Client Registration.
+  # Active only when the platform provisions clients that way; the credentials
+  # land in a Secret carrying the same keys the deployment reads.
+  - name: oidc-dcr
+    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}'
+    timeout: 10m
+    source:
+      oci:
+        repository: quay.io/adaltas/oidc-dcr
+        tag: 0.3.2
+    values: |
+      {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
+      {{- $release := printf "%v" .Release.metadata.name -}}
+      {{- $dcr := .Context.oidc.dcr | default dict -}}
+      {{- if and (eq (.Context.oidc.clientProvisioning | default "existing") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
+      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
+      {{- end }}
+
+      ttl_seconds: 30
+      registration_url: {{ $dcr.registrationUrl | quote }}
+      request:
+        application_type: web
+        client_name: "{{ $release }}-{{ $namespace }}"
+        redirect_uris:
+          - "https://spark-web-proxy-{{ $namespace }}.{{ .Context.ingress.suffix }}/home"
+        grant_types:
+          - "authorization_code"
+          - "refresh_token"
+        # openid is rejected by Keycloak here.
+        scope: {{ append (without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid") "offline_access" | join " " | quote }}
+      tls:
+        insecure: false
+        certificate: "certs-bundle"
+      secret: "{{ $release }}-{{ $namespace }}-dcr"
+      mapping:
+        use_default: false
+        key_mapping:
+          client_id: ".client_id"
+          client_secret: ".client_secret"
+
   - name: internal-secrets
     source:
       local:
@@ -249,6 +299,8 @@ modules:
         spark.ui.view.acls.groups: {{ $viewGroups | join "," | quote }}
       {{- end }}
 
+      {{- $oauthSecret := printf "creds-%s-oauth2" .Release.metadata.name }}
+      {{- if eq (.Context.oidc.clientProvisioning | default "existing") "dcr" }}{{- $oauthSecret = printf "%s-%s-dcr" .Release.metadata.name .Release.spec.targetNamespace }}{{- end }}
       extraEnvs:
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
@@ -268,12 +320,12 @@ modules:
         - name: AUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:
-              name: {{ printf "creds-%s-oauth2" .Release.metadata.name }}
+              name: {{ $oauthSecret }}
               key: client_id
         - name: AUTH_CLIENT_SECRET
           valueFrom:
             secretKeyRef:
-              name: {{ printf "creds-%s-oauth2" .Release.metadata.name }}
+              name: {{ $oauthSecret }}
               key: client_secret
         - name: AUTH_COOKIE_ENCRYPTION_KEY
           valueFrom:

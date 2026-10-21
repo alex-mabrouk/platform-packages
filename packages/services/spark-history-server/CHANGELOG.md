@@ -14,6 +14,7 @@
 ### Features
 
 * describe the package with contract 0.2
+* register the OAuth client through dynamic client registration when the platform provisions clients that way
 
 
 ### Bug Fixes
