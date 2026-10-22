@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: trino
-tag: 2.0.0-alpha.4 # x-release-please-version
+tag: 2.0.0-alpha.5 # x-release-please-version
 description: |
   Apache Trino - Distributed SQL query engine designed for large-scale data processing across multiple data sources.
   High-performance, in-memory query engine that enables fast, interactive analytics on diverse data systems.
@@ -50,6 +50,10 @@ extensions:
         providerScope: system-wide
       - capability: okdp.io/identity-provider
         providerScope: system-wide
+      # Required when the platform registers the clients (oidc.clientProvisioning dcr).
+      - capability: okdp.io/identity-client-registration
+        providerScope: system-wide
+        optional: true
       - capability: okdp.io/platform-tools
         providerScope: system-wide
       - capability: okdp.io/secrets-backend
@@ -246,7 +250,7 @@ extensions:
     sideEffects:
       external:
         - kind: identity-client
-          description: OIDC client registered through dynamic client registration when the platform provisions clients that way
+          description: OIDC client, registered with the platform when it provisions the clients (dcr) and removed with the instance
     lifecycle:
       applyTimeout: 15m
       rollback: supported
@@ -280,8 +284,8 @@ schema:
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
-              registrationUrl: { type: string }
-              authMethod: { type: string }
+              provider: { type: string, default: platform }
+              grantee: { type: string, default: oidc-system/oidc-client-operator }
 
 
 inputs:
@@ -406,51 +410,40 @@ modules:
           {{- end }}
           {{- end }}
 
+  # The OIDC client, registered with the platform when it provisions it (dcr).
   - name: oidc-dcr
     enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
-        repository: quay.io/adaltas/oidc-dcr
-        tag: 0.3.2
+        repository: ghcr.io/alex-mabrouk/charts/oidc-client
+        tag: 0.1.2
     values: |
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
-      {{- $domain := printf "%v" .Context.ingress.suffix -}}
-
-      {{- $oidcIssuerUri := .Context.oidc.issuerUri -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
-      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
-      {{- end }}
-      {{- $oidcRegistrationUrl := $dcr.registrationUrl -}}
+      {{- $grantee := splitList "/" ($dcr.grantee | default "oidc-system/oidc-client-operator") -}}
+      {{- if ne (len $grantee) 2 }}{{ fail "oidc.dcr.grantee must be <namespace>/<serviceaccount>" }}{{ end }}
 
-      ttl_seconds: 30
-      registration_url: "{{ $oidcRegistrationUrl }}"
-      request:
-        application_type: web
-        client_name: "{{ $release }}-{{ $namespace }}"
-        redirect_uris:
-          - "https://trino-{{ $namespace }}.{{ $domain }}/oauth2/callback"
-        logo_uri: "https://landscape.cncf.io/logos/008125b82108f19aea6b0004ce5f255b72bab5b5e5c169a302d7bf845edb8e6b.svg"
-        grant_types:
-          - "authorization_code"
-          - "client_credentials"
-        # Keycloak realm client scopes granted to the registered client.
-        scope: "web-origins acr roles profile groups basic email address phone organization offline_access microprofile-jwt"
-      tls:
-        insecure: false
-        certificate: "certs-bundle"
-      secret: "{{ $release }}-{{ $namespace }}-dcr"
-      mapping:
-        use_default: false
-        key_mapping:
-          OIDC_CLIENT_ID: ".client_id"
-          OIDC_CLIENT_SECRET: ".client_secret"
-          OIDC_ISSUER_URL: "{{ $oidcIssuerUri }}"
-          OIDC_SCOPES: "{{ .Context.oidc.scope }}"
+      provider: {{ $dcr.provider | default "platform" | quote }}
+      grant:
+        namespace: {{ index $grantee 0 | quote }}
+        serviceAccount: {{ index $grantee 1 | quote }}
+      clients:
+        {{ $release }}:
+          client:
+            grantTypes: [authorization_code]
+            redirectUris:
+              - "https://trino-{{ $namespace }}.{{ .Context.ingress.suffix }}/oauth2/callback"
+            scopes: {{ without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid" | toJson }}
+          credentials:
+            secretName: {{ $release }}-oidc
 
   - name: main
+    dependsOn: |
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
+      - oidc-dcr
+      {{- end }}
     timeout: 10m
     source:
       helmRepository:
@@ -470,7 +463,7 @@ modules:
 
       {{- $oidcScopes := (.Context.oidc.scope | default "openid profile email groups") | replace " " "," -}}
       {{- $oauthSecret := printf "creds-%s-oauth2" $release -}}
-      {{- $enableDCR := eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" -}}
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}{{- $oauthSecret = printf "%s-oidc" $release -}}{{- end }}
 
       {{- $trinoEndpoint := printf "trino-%s.%s" $namespace $domain -}}
 
@@ -526,24 +519,14 @@ modules:
         - name: TRINO_OAUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:
-              {{- if $enableDCR }}
-              name: {{ $release }}-{{ $namespace }}-dcr
-              key: OIDC_CLIENT_ID
-              {{- else }}
               name: {{ $oauthSecret }}
               key: client_id
-              {{- end }}
 
         - name: TRINO_OAUTH_CLIENT_SECRET
           valueFrom:
             secretKeyRef:
-              {{- if $enableDCR }}
-              name: {{ $release }}-{{ $namespace }}-dcr
-              key: OIDC_CLIENT_SECRET
-              {{- else }}
               name: {{ $oauthSecret }}
               key: client_secret
-              {{- end }}
 
         {{- range $ic := $icebergCatalogs }}
         {{- $envPrefix := upper (replace "-" "_" $ic.name) }}

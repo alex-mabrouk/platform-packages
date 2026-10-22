@@ -1,6 +1,6 @@
 apiVersion: v1alpha1
 name: airflow
-tag: 2.0.0-alpha.4 # x-release-please-version
+tag: 2.0.0-alpha.5 # x-release-please-version
 description: |
   Apache Airflow 3.2.2 - Workflow orchestration platform with Spark Operator integration
 
@@ -38,6 +38,10 @@ extensions:
         providerScope: system-wide
       - capability: okdp.io/identity-provider
         providerScope: system-wide
+      # Required when the platform registers the clients (oidc.clientProvisioning dcr).
+      - capability: okdp.io/identity-client-registration
+        providerScope: system-wide
+        optional: true
       - capability: okdp.io/platform-tools
         providerScope: system-wide
       - capability: okdp.io/secrets-backend
@@ -164,7 +168,7 @@ extensions:
     sideEffects:
       external:
         - kind: identity-client
-          description: OIDC client registered through dynamic client registration when the platform provisions clients that way
+          description: OIDC client, registered with the platform when it provisions the clients (dcr) and removed with the instance
     lifecycle:
       applyTimeout: 15m
       rollback: unsupported
@@ -200,53 +204,43 @@ schema:
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
-              registrationUrl: { type: string }
-              authMethod: { type: string }
+              provider: { type: string, default: platform }
+              grantee: { type: string, default: oidc-system/oidc-client-operator }
 
 inputs:
   - { contract: database-server, alias: db, fromParameter: db }
   - { contract: s3, alias: storage, fromParameter: storage }
 
 modules:
-  # Registers the OIDC client through anonymous Dynamic Client Registration.
-  # Active only when the platform provisions clients that way; the credentials
-  # land in a Secret carrying the same keys the deployment reads.
+  # The OIDC client, registered with the platform when it provisions it (dcr).
   - name: oidc-dcr
     enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
-        repository: quay.io/adaltas/oidc-dcr
-        tag: 0.3.2
+        repository: ghcr.io/alex-mabrouk/charts/oidc-client
+        tag: 0.1.2
     values: |
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
-      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
-      {{- end }}
+      {{- $grantee := splitList "/" ($dcr.grantee | default "oidc-system/oidc-client-operator") -}}
+      {{- if ne (len $grantee) 2 }}{{ fail "oidc.dcr.grantee must be <namespace>/<serviceaccount>" }}{{ end }}
 
-      ttl_seconds: 30
-      registration_url: {{ $dcr.registrationUrl | quote }}
-      request:
-        application_type: web
-        client_name: "{{ $release }}-{{ $namespace }}"
-        redirect_uris:
-          - "https://airflow-{{ $namespace }}.{{ .Context.ingress.suffix }}/auth/oauth-authorized/oidc"
-        grant_types:
-          - "authorization_code"
-          - "client_credentials"
-        # openid is rejected by Keycloak here; offline_access must match the login scope below.
-        scope: {{ append (without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid") "offline_access" | join " " | quote }}
-      tls:
-        insecure: false
-        certificate: "certs-bundle"
-      secret: "{{ $release }}-{{ $namespace }}-dcr"
-      mapping:
-        use_default: false
-        key_mapping:
-          client_id: ".client_id"
-          client_secret: ".client_secret"
+      provider: {{ $dcr.provider | default "platform" | quote }}
+      grant:
+        namespace: {{ index $grantee 0 | quote }}
+        serviceAccount: {{ index $grantee 1 | quote }}
+      clients:
+        {{ $release }}:
+          client:
+            grantTypes: [authorization_code]
+            redirectUris:
+              - "https://airflow-{{ $namespace }}.{{ .Context.ingress.suffix }}/auth/oauth-authorized/oidc"
+            # offline_access must match the login scope of main.
+            scopes: {{ append (without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid") "offline_access" | toJson }}
+          credentials:
+            secretName: {{ $release }}-oidc
 
   - name: internal-secrets
     source:
@@ -263,6 +257,10 @@ modules:
               encoding: base64
               length: "64"
   - name: main
+    dependsOn: |
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
+      - oidc-dcr
+      {{- end }}
     timeout: 15m
     source:
       helmRepository:
@@ -290,12 +288,11 @@ modules:
       {{- end }}
       {{- $airflowOidcEnabled := true }}
       {{- if hasKey .Context.oidc "enabled" }}{{- $airflowOidcEnabled = .Context.oidc.enabled }}{{ end }}
-      {{- /* offline_access here must stay registered by the oidc-dcr module above. */}}
+      {{- /* offline_access here must stay in the scopes of the oidc-dcr client above. */}}
       {{- $airflowOidcScope := printf "%s offline_access" (.Context.oidc.scope | default "openid profile email groups") | replace " " "+" }}
       {{- $airflowDCR := eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
-      {{- /* In dcr mode the registration job writes the credentials, under the same keys. */}}
       {{- $airflowOauthSecret := printf "creds-%s-oauth2" .Release.metadata.name }}
-      {{- if $airflowDCR }}{{- $airflowOauthSecret = printf "%s-%s-dcr" .Release.metadata.name .Release.spec.targetNamespace }}{{- end }}
+      {{- if $airflowDCR }}{{- $airflowOauthSecret = printf "%s-oidc" .Release.metadata.name }}{{- end }}
       {{- $airflowGroupRoles := dict }}
       {{- range $role, $groups := (.Parameters.access | default dict) }}
       {{- range $groups }}{{ $_ := set $airflowGroupRoles . (append (get $airflowGroupRoles . | default list) $role) }}{{ end }}
