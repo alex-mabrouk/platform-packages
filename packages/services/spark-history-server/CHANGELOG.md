@@ -11,12 +11,13 @@
 * `storage` is a plain string naming the s3 Connection, read through an `inputs` entry
 * `roleMapping` is replaced by `access`: `admin`, `historyAdmin`, `modify` and `view` list the groups granted each Spark ACL
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
+* the OIDC client is an `OIDCClient` object: in mode `dcr` its Secret is `<release>-oidc`, and the Context keys `oidc.dcr.registrationUrl` and `oidc.dcr.authMethod` give way to `oidc.dcr.provider` and `oidc.dcr.grantee`
 
 ### Features
 
 * describe the package with contract 0.2
 * register the OAuth client through dynamic client registration when the platform provisions clients that way
-
+* register the OIDC client with the platform client registration (`okdp.io/identity-client-registration`), which removes it with the instance; the service starts once its client is ready; a client registered again is used after a restart of the instance
 
 ### Bug Fixes
 

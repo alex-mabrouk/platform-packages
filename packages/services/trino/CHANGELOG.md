@@ -12,12 +12,14 @@
 * `icebergCatalogs[].oidcSecretRef` is required: the Polaris principal is never the Trino OIDC client; catalog names match `^[a-z][a-z0-9_-]*$`
 * `enableOPAL` needs `enableOPA`
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
+* the OIDC client is an `OIDCClient` object: in mode `dcr` its Secret is `<release>-oidc`, and the Context keys `oidc.dcr.registrationUrl` and `oidc.dcr.authMethod` give way to `oidc.dcr.provider` and `oidc.dcr.grantee`; the client no longer asks for the client_credentials grant, its scopes are `oidc.scope` without `openid` instead of a list of Keycloak scopes, and Trino reads the keys `client_id` and `client_secret`
 
 ### Features
 
 * describe the package with contract 0.2
 * Trino 484, chart 1.45.0
 * OPA 1.21.3, opa-kube-mgmt chart 11.0.14
+* register the OIDC client with the platform client registration (`okdp.io/identity-client-registration`), which removes it with the instance; the service starts once its client is ready; a client registered again is used after a restart of the instance
 
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/trino/v1.0.0...trino/v1.0.1) (2026-09-25)
 

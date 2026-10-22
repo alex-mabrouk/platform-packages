@@ -11,11 +11,13 @@
 * `db` and `storage` are plain strings naming the database-server and s3 Connections, read through `inputs` entries
 * `oidcRoleMapping` is replaced by `access`, the groups granted each Airflow role; `dagsGitSync.credentialsSecret` needs a `name`
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
+* the OIDC client is an `OIDCClient` object: in mode `dcr` its Secret is `<release>-oidc`, and the Context keys `oidc.dcr.registrationUrl` and `oidc.dcr.authMethod` give way to `oidc.dcr.provider` and `oidc.dcr.grantee`; the client no longer asks for the client_credentials grant
 
 ### Features
 
 * describe the package with contract 0.2
 * Apache Airflow 3.2.2, chart 1.22.0
+* register the OIDC client with the platform client registration (`okdp.io/identity-client-registration`), which removes it with the instance; the service starts once its client is ready; a client registered again is used after a restart of the instance
 
 ### Bug Fixes
 

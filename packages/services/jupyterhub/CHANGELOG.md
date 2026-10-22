@@ -12,12 +12,14 @@
 * the kubauth client provisioning is removed, with the `oidc-client` module and the `oidc.kubauth` context key: `oidc.clientProvisioning` is `existing` (the OAuth client Secret `creds-<release>-oauth2` is provided) or `dcr`
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
 * `oidcRoleMapping` is replaced by `access`: `users` and `admins` list the groups allowed to sign in and made admins
+* the OIDC client is an `OIDCClient` object: in mode `dcr` its Secret is `<release>-oidc`, and the Context keys `oidc.dcr.registrationUrl` and `oidc.dcr.authMethod` give way to `oidc.dcr.provider` and `oidc.dcr.grantee`
 
 ### Features
 
 * describe the package with contract 0.2
 * register the OAuth client through dynamic client registration when the platform provisions clients that way
 * JupyterHub 5.5.4, chart 4.4.4
+* register the OIDC client with the platform client registration (`okdp.io/identity-client-registration`), which removes it with the instance; the service starts once its client is ready; a client registered again is used after a restart of the instance
 
 ### Bug Fixes
 
