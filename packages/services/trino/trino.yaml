@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: trino
-tag: 2.0.0-alpha.3 # x-release-please-version
+tag: 2.0.0-alpha.4 # x-release-please-version
 description: |
   Apache Trino - Distributed SQL query engine designed for large-scale data processing across multiple data sources.
   High-performance, in-memory query engine that enables fast, interactive analytics on diverse data systems.
@@ -491,6 +491,7 @@ modules:
         {{ $c.name }}: |
           connector.name=hive
           hive.metastore.uri={{ $metastore.thriftUri }}
+          hive.non-managed-table-writes-enabled=true
           fs.native-s3.enabled=true
           s3.endpoint={{ $storage.apiUrl }}
           s3.path-style-access={{ $storage.pathStyle | default false }}
