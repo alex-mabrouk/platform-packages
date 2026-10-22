@@ -23,5 +23,6 @@
 
 ### Bug Fixes
 
+* pass on only the polaris_<role> groups as principal roles: Polaris 1.8 refuses a token asking for a principal role not granted to the principal
 * **polaris:** move the console to chart 0.2.0 ([a29b1fe](https://github.com/OKDP/platform-packages/commit/a29b1fe36b325baf0d73458970e9abc87de236ee))
 * replace release please anotation with custom release increment ([99c6bdc](https://github.com/OKDP/platform-packages/commit/99c6bdc8b8158dea5fcb1a49107529d35808cdb9))

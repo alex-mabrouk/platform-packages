@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: polaris
-tag: 2.0.0-alpha.2 # x-release-please-version
+tag: 2.0.0-alpha.3 # x-release-please-version
 description: |
   Apache Polaris is an open-source, fully-featured catalog for Apache Iceberg™.
 usage:
@@ -466,23 +466,14 @@ modules:
           # You can use 'sub' as stable and immutable identity
           idClaimPath: ~
           nameClaimPath: "preferred_username"
-        # Mapped OIDC groups are visible, but they do not have the same effect as internal Polaris assignments.
-        # Issue: https://github.com/apache/polaris/issues/2373
-        # Polaris activates only the internal principal roles that are actually granted to that principal in Polaris RBAC
-        # Active Polaris roles = (mapped groups) ∩ (principal roles granted in Polaris)
+        # Polaris refuses a token asking for a principal role not granted to the principal, so only the
+        # polaris_<role> groups are passed on, as PRINCIPAL_ROLE:<role>. The roles must be granted in Polaris.
         principalRolesMapper:
           type: default
           rolesClaimPath: groups
+          filter: "^polaris_.+$"
           mappings:
-            # The rules are applied sequentially as ordered transforms
-            # Strip the "polaris_" prefix from admin groups and convert them to Polaris roles:
-            # polaris_service_admin -> PRINCIPAL_ROLE:service_admin
-            # polaris_catalog_admin -> PRINCIPAL_ROLE:catalog_admin
-            # platform_admin -> PRINCIPAL_ROLE:platform_admin
             - regex: "^polaris_(.*)$"
-              replacement: "PRINCIPAL_ROLE:$1"
-            # Fallback for other groups, but do NOT touch values already prefixed by Polaris.
-            - regex: "^(?!PRINCIPAL_ROLE:)(?!polaris_)(.*)$"
               replacement: "PRINCIPAL_ROLE:$1"
 
       logging:
