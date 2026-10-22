@@ -16,7 +16,6 @@
 
 * describe the package with contract 0.2
 * register the login client and the Trino client through dynamic client registration when the platform provisions clients that way
-* Apache Superset 6.1.0
 
 ## [1.1.0](https://github.com/OKDP/platform-packages/compare/superset/v1.0.0...superset/v1.1.0) (2026-09-25)
 
