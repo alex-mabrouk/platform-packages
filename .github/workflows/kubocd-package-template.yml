@@ -127,13 +127,13 @@ jobs:
           kubocd version
 
       # Checks the OKDP descriptor and writes the artifact config. The
-      # capability registry is read from the same commit (v0.1.11).
+      # capability registry is read from the same commit (v0.1.12).
       # OKDP_CONTRACT is the target contract version the packages are checked
       # against: every rule up to it applies.
       - name: Install okdp-contract CLI 🛠️
         env:
           OKDP_CONTRACT_REPO: https://github.com/alex-mabrouk/okdp-contract.git
-          OKDP_CONTRACT_REF: 189df21291714b32379304d1eec9c86293b540e9
+          OKDP_CONTRACT_REF: d8d40ccbb6bea6b9e8704c4b51cd1f536cb628af
         run: |
           git clone --filter=blob:none "${OKDP_CONTRACT_REPO}" "${RUNNER_TEMP}/okdp-contract"
           cd "${RUNNER_TEMP}/okdp-contract"
