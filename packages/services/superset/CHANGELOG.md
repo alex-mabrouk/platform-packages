@@ -11,11 +11,13 @@
 * `metadataDb`, `examplesDb` and `datasources[].trino` are plain strings naming Connections, read through `inputs` entries
 * `oidcRoleMapping` is replaced by `access`, the groups granted each Superset role
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers its OAuth client unless the platform Context says `existing`
+* the OIDC clients are `OIDCClient` objects: in mode `dcr` their Secrets are `<release>-oidc` and `<release>-oidc-trino`, and the Context keys `oidc.dcr.registrationUrl` and `oidc.dcr.authMethod` give way to `oidc.dcr.provider` and `oidc.dcr.grantee`
 
 ### Features
 
 * describe the package with contract 0.2
 * register the login client and the Trino client through dynamic client registration when the platform provisions clients that way
+* register the login and Trino clients with the platform client registration (`okdp.io/identity-client-registration`), which removes them with the instance; Superset starts once its clients are ready; a client registered again is used after a restart of the instance
 
 ## [1.1.0](https://github.com/OKDP/platform-packages/compare/superset/v1.0.0...superset/v1.1.0) (2026-09-25)
 
