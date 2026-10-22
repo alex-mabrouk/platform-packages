@@ -3,7 +3,7 @@
   "packages/services/hive-metastore": "2.0.0-alpha.1",
   "packages/services/jupyterhub": "2.0.0-alpha.2",
   "packages/services/okdp-examples": "1.0.1",
-  "packages/services/polaris": "2.0.0-alpha.4",
+  "packages/services/polaris": "2.0.0-alpha.5",
   "packages/services/spark-defaults": "2.0.0-alpha.2",
   "packages/services/spark-history-server": "2.0.0-alpha.1",
   "packages/services/spark-operator": "2.0.0-alpha.2",

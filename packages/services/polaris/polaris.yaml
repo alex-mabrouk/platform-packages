@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: polaris
-tag: 2.0.0-alpha.4 # x-release-please-version
+tag: 2.0.0-alpha.5 # x-release-please-version
 description: |
   Apache Polaris is an open-source, fully-featured catalog for Apache Iceberg™.
 usage:
@@ -311,19 +311,14 @@ modules:
     timeout: 10m
     source:
       oci:
-        repository: quay.io/okdp/charts/polaris-admin
-        tag: 1.0.0
+        repository: ghcr.io/alex-mabrouk/charts/polaris-admin
+        tag: 1.0.1-alpha.1
     values: |
       phase: "bootstrap"
 
       bootstrap:
 
         purge: false
-
-        image:
-          repository: apache/polaris-admin-tool
-          tag: 1.8.0
-          pullPolicy: IfNotPresent
 
         database:
           jdbcUrl: "jdbc:postgresql://{{ .Inputs.db.host }}:{{ .Inputs.db.port }}/{{ .Inputs.db.dbName }}"
@@ -536,8 +531,8 @@ modules:
     timeout: 10m
     source:
       oci:
-        repository: quay.io/okdp/charts/polaris-admin
-        tag: 1.0.0
+        repository: ghcr.io/alex-mabrouk/charts/polaris-admin
+        tag: 1.0.1-alpha.1
     values: |
 
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
@@ -547,11 +542,6 @@ modules:
       phase: "principals"
 
       principals:
-
-        image:
-          repository: curlimages/curl
-          tag: 8.23.0
-          pullPolicy: IfNotPresent
 
         polaris:
           url: {{ $polarisInternalUrl }}
