@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: okdp-control-plane-server
-tag: 2.0.0-alpha.1 # x-release-please-version
+tag: 2.0.0-alpha.2 # x-release-please-version
 description: |
   OKDP Server - API backend for the Open Kubernetes Data Platform
 usage:
@@ -30,7 +30,7 @@ extensions:
   okdp.io:
     apiVersion: okdp.io/v1alpha1
     kind: PackageDescriptor
-    appVersion: 0.9.0
+    appVersion: 0.10.0
     displayName: OKDP control plane server
     description: API of the platform catalog, projects and service installations
     category: platform
@@ -64,7 +64,7 @@ extensions:
         imageTag:
           type: string
           minLength: 1
-          default: "0.9.0"
+          default: "0.10.0"
           title: Image tag
           description: "Server image tag. Set explicitly so the deployed image is pinned rather than following the chart appVersion."
           x-okdp-group: Image
@@ -141,7 +141,7 @@ modules:
     source:
       oci:
         repository: quay.io/okdp/charts/okdp-control-plane-server
-        tag: 0.9.0
+        tag: 0.10.0
     values: |
       {{- $domain := printf "%v" .Context.ingress.suffix -}}
       {{- $console := .Parameters.consoleHost | default (printf "okdp-ui.%s" $domain) -}}

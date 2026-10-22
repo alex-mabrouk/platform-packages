@@ -17,10 +17,12 @@
 
 * describe the package with contract 0.2
 * Trino 484, chart 1.45.0
+* OPA 1.21.3, opa-kube-mgmt chart 11.0.14
 
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/trino/v1.0.0...trino/v1.0.1) (2026-09-25)
 
 
 ### Bug Fixes
 
+* allow inserts into the Hive tables: the metastore registers the tables Trino creates as external tables
 * replace release please anotation with custom release increment ([99c6bdc](https://github.com/OKDP/platform-packages/commit/99c6bdc8b8158dea5fcb1a49107529d35808cdb9))

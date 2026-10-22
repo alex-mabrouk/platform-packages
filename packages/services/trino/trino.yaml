@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: trino
-tag: 2.0.0-alpha.2 # x-release-please-version
+tag: 2.0.0-alpha.4 # x-release-please-version
 description: |
   Apache Trino - Distributed SQL query engine designed for large-scale data processing across multiple data sources.
   High-performance, in-memory query engine that enables fast, interactive analytics on diverse data systems.
@@ -309,14 +309,14 @@ modules:
       helmRepository:
         url: https://open-policy-agent.github.io/kube-mgmt/charts
         chart: opa-kube-mgmt
-        version: 11.0.7
+        version: 11.0.14
     values: |
       fullnameOverride: {{ .Release.metadata.name }}-opa
       authz:
         enabled: false
       image:
         repository: openpolicyagent/opa
-        tag: 1.16.1
+        tag: 1.21.3
         pullPolicy: IfNotPresent
       useHttps: false
       port: 8181
@@ -491,6 +491,7 @@ modules:
         {{ $c.name }}: |
           connector.name=hive
           hive.metastore.uri={{ $metastore.thriftUri }}
+          hive.non-managed-table-writes-enabled=true
           fs.native-s3.enabled=true
           s3.endpoint={{ $storage.apiUrl }}
           s3.path-style-access={{ $storage.pathStyle | default false }}

@@ -17,7 +17,7 @@
 
 * describe the package with contract 0.2
 * register the OAuth client through dynamic client registration when the platform provisions clients that way
-
+* JupyterHub 5.5.4, chart 4.4.4
 
 ### Bug Fixes
 

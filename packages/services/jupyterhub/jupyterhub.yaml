@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: jupyterhub
-tag: 2.0.0-alpha.1 # x-release-please-version
+tag: 2.0.0-alpha.2 # x-release-please-version
 description: |
   JupyterHub - Multi-user interactive development environment for data science and machine learning.
   Provides secure, scalable Jupyter notebook access with integrated authentication, resource management,
@@ -31,7 +31,7 @@ extensions:
   okdp.io:
     apiVersion: okdp.io/v1alpha1
     kind: PackageDescriptor
-    appVersion: 5.4.4
+    appVersion: 5.5.4
     displayName: JupyterHub
     description: Multi-user notebooks of a project, with PySpark kernels wired to the project data
     category: development
@@ -287,7 +287,7 @@ modules:
       helmRepository:
         url: https://hub.jupyter.org/helm-chart/
         chart: jupyterhub
-        version: 4.3.3
+        version: 4.4.4
     values: |
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
@@ -413,7 +413,7 @@ modules:
           pullPolicy: Always
           pullSecrets: []
           name: quay.io/jupyterhub/k8s-hub
-          tag: "4.3.3"
+          tag: "4.4.4"
         db:
           type: sqlite-pvc
           pvc:

@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: spark-operator
-tag: 2.0.0-alpha.1 # x-release-please-version
+tag: 2.0.0-alpha.2 # x-release-please-version
 description: |
   Spark Operator 2.4.0 - Kubernetes operator for managing Apache Spark applications
 
@@ -71,7 +71,7 @@ extensions:
   okdp.io:
     apiVersion: okdp.io/v1alpha1
     kind: PackageDescriptor
-    appVersion: 2.4.0
+    appVersion: 2.5.2
     displayName: Spark Operator
     description: Kubernetes operator running Apache Spark applications from SparkApplication resources
     category: processing
@@ -169,7 +169,7 @@ modules:
       helmRepository:
         url: https://kubeflow.github.io/spark-operator
         chart: spark-operator
-        version: 2.4.0
+        version: 2.5.2
     values: |
       # Helm hook configuration
       hook:

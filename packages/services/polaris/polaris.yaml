@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: polaris
-tag: 2.0.0-alpha.1 # x-release-please-version
+tag: 2.0.0-alpha.5 # x-release-please-version
 description: |
   Apache Polaris is an open-source, fully-featured catalog for Apache Iceberg™.
 usage:
@@ -30,14 +30,14 @@ extensions:
   okdp.io:
     apiVersion: okdp.io/v1alpha1
     kind: PackageDescriptor
-    appVersion: 1.3.0-incubating
+    appVersion: 1.8.0
     displayName: Apache Polaris
     description: Iceberg REST catalog of a project, with its console
     category: catalog
     maturity: beta
     edition: community
     license: Apache-2.0
-    documentation: https://polaris.apache.org/releases/1.3.0/
+    documentation: https://polaris.apache.org/releases/1.8.0/
     maintainer: OKDP
     keywords: [polaris, iceberg, catalog]
     capabilities:
@@ -283,26 +283,42 @@ modules:
             - fieldName: client_secret
               encoding: base64
               length: "32"
+        - name: "creds-{{ .Release.metadata.name }}-token-key"
+          fields:
+            - fieldName: symmetric.key
+              length: "64"
+
+  # Polaris no longer creates its database schema; the bootstrap expects it.
+  - name: schema
+    timeout: 5m
+    source:
+      local:
+        path: ../../../charts/postgres-schema
+    values: |
+      schema: polaris_schema
+      database:
+        host: {{ .Inputs.db.host | quote }}
+        port: {{ .Inputs.db.port }}
+        name: {{ .Inputs.db.dbName | quote }}
+        sslMode: {{ .Inputs.db.sslMode | default "prefer" | quote }}
+        secret:
+          name: {{ .Inputs.db.secretRef | quote }}
 
   - name: bootstrap
     dependsOn:
       - internal-secrets
+      - schema
     timeout: 10m
     source:
       oci:
-        repository: quay.io/okdp/charts/polaris-admin
-        tag: 1.0.0
+        repository: ghcr.io/alex-mabrouk/charts/polaris-admin
+        tag: 1.0.1-alpha.1
     values: |
       phase: "bootstrap"
 
       bootstrap:
 
         purge: false
-
-        image:
-          repository: apache/polaris-admin-tool
-          tag: 1.3.0-incubating
-          pullPolicy: IfNotPresent
 
         database:
           jdbcUrl: "jdbc:postgresql://{{ .Inputs.db.host }}:{{ .Inputs.db.port }}/{{ .Inputs.db.dbName }}"
@@ -328,9 +344,9 @@ modules:
     timeout: 10m
     source:
       helmRepository:
-        url: https://downloads.apache.org/incubator/polaris/helm-chart/
+        url: https://downloads.apache.org/polaris/helm-chart/
         chart: polaris
-        version: 1.3.0-incubating
+        version: 1.8.0
     values: |
 
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
@@ -351,7 +367,7 @@ modules:
       image:
         repository: apache/polaris
         pullPolicy: IfNotPresent
-        tag: "1.3.0-incubating"
+        tag: "1.8.0"
 
       resources:
         limits:
@@ -431,10 +447,13 @@ modules:
         polaris.realm-context.header-name: "Polaris-Realm"
         # Spark and Trino do not pass the header
         # polaris.realm-context.require-header: false
-        quarkus.http.cors.enabled: "true"
 
       authentication:
         type: mixed
+        tokenBroker:
+          type: symmetric-key
+          secret:
+            name: "creds-{{ .Release.metadata.name }}-token-key"
 
       oidc:
         authServeUrl: {{ $oidcIssuerUri }}
@@ -450,29 +469,18 @@ modules:
           # You can use 'sub' as stable and immutable identity
           idClaimPath: ~
           nameClaimPath: "preferred_username"
-        # Mapped OIDC groups are visible, but they do not have the same effect as internal Polaris assignments.
-        # Issue: https://github.com/apache/polaris/issues/2373
-        # Polaris activates only the internal principal roles that are actually granted to that principal in Polaris RBAC
-        # Active Polaris roles = (mapped groups) ∩ (principal roles granted in Polaris)
+        # Polaris refuses a token asking for a principal role not granted to the principal, so only the
+        # polaris_<role> groups are passed on, as PRINCIPAL_ROLE:<role>. The roles must be granted in Polaris.
         principalRolesMapper:
           type: default
           rolesClaimPath: groups
+          filter: "^polaris_.+$"
           mappings:
-            # The rules are applied sequentially as ordered transforms
-            # Strip the "polaris_" prefix from admin groups and convert them to Polaris roles:
-            # polaris_service_admin -> PRINCIPAL_ROLE:service_admin
-            # polaris_catalog_admin -> PRINCIPAL_ROLE:catalog_admin
-            # platform_admin -> PRINCIPAL_ROLE:platform_admin
             - regex: "^polaris_(.*)$"
               replacement: "PRINCIPAL_ROLE:$1"
-            # Fallback for other groups, but do NOT touch values already prefixed by Polaris.
-            - regex: "^(?!PRINCIPAL_ROLE:)(?!polaris_)(.*)$"
-              replacement: "PRINCIPAL_ROLE:$1"
-
-      logging:
-        level: DEBUG
 
       cors:
+        enabled: true
         allowedOrigins:
           - "https://polaris-console-{{ $namespace }}.{{ $domain }}"
         allowedMethods:
@@ -523,8 +531,8 @@ modules:
     timeout: 10m
     source:
       oci:
-        repository: quay.io/okdp/charts/polaris-admin
-        tag: 1.0.0
+        repository: ghcr.io/alex-mabrouk/charts/polaris-admin
+        tag: 1.0.1-alpha.1
     values: |
 
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
@@ -534,11 +542,6 @@ modules:
       phase: "principals"
 
       principals:
-
-        image:
-          repository: curlimages/curl
-          tag: 8.18.0
-          pullPolicy: IfNotPresent
 
         polaris:
           url: {{ $polarisInternalUrl }}

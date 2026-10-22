@@ -13,6 +13,7 @@
 ### Features
 
 * describe the package with contract 0.2
+* Spark Operator 2.5.2
 
 ## [1.0.1](https://github.com/OKDP/platform-packages/compare/spark-operator/v1.0.0...spark-operator/v1.0.1) (2026-09-25)
 

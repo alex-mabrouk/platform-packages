@@ -1,0 +1,27 @@
+# The schema to create and where. The Secret holds the credentials of a role
+# allowed to create schemas in the database, usually its owner.
+#
+# schema: polaris_schema
+# database:
+#   host: mydb-rw.myns.svc.cluster.local
+#   port: 5432
+#   name: mydb
+#   sslMode: disable
+#   secret:
+#     name: mydb-app
+#     usernameKey: username
+#     passwordKey: password
+schema: ""
+database:
+  host: ""
+  port: 5432
+  name: ""
+  sslMode: prefer
+  secret:
+    name: ""
+    usernameKey: username
+    passwordKey: password
+image:
+  repository: postgres
+  tag: 18.6-alpine
+  pullPolicy: IfNotPresent
