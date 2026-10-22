@@ -19,6 +19,10 @@
 * register the login client and the Trino client through dynamic client registration when the platform provisions clients that way
 * register the login and Trino clients with the platform client registration (`okdp.io/identity-client-registration`), which removes them with the instance; Superset starts once its clients are ready; a client registered again is used after a restart of the instance
 
+### Bug Fixes
+
+* install without datasources: the import file listed no database as `null`, which failed the init job
+
 ## [1.1.0](https://github.com/OKDP/platform-packages/compare/superset/v1.0.0...superset/v1.1.0) (2026-09-25)
 
 
