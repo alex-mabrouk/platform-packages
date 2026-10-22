@@ -12,6 +12,7 @@
 * `db` and `storage` are plain strings naming the database-server and s3 Connections, read through `inputs` entries
 * `oidc.clientProvisioning` defaults to `dcr`: the package registers the server and console clients unless the platform Context says `existing`
 * the principal roles are mapped from the `groups` claim instead of `realm_access/roles`; the `roles` scope is no longer requested
+* the OIDC clients are `OIDCClient` objects: in mode `dcr` their Secrets are `<release>-oidc` and `<release>-oidc-console`, and the Context keys `oidc.dcr.registrationUrl` and `oidc.dcr.authMethod` give way to `oidc.dcr.provider` and `oidc.dcr.grantee`; in mode `existing` the console reads its client id from the Secret `creds-<release>-oauth2-console`
 
 ### Features
 
@@ -19,6 +20,7 @@
 * describe the package with contract 0.2
 * register the server client and the public console client through dynamic client registration; the console reads its client id from a Secret, with the polaris-console chart 0.2.1
 * Apache Polaris 1.8.0; the database schema is created before the bootstrap, which no longer does it
+* register the server and console clients with the platform client registration (`okdp.io/identity-client-registration`), which removes them with the instance; the server starts once its clients are ready; a client registered again is used after a restart of the instance
 
 
 ### Bug Fixes

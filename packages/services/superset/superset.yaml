@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: superset
-tag: 2.0.0-alpha.3 # x-release-please-version
+tag: 2.0.0-alpha.4 # x-release-please-version
 description: |
   Apache Superset - Enterprise business intelligence platform for modern data teams.
   Self-service analytics tool that enables users to create interactive dashboards, explore datasets,
@@ -50,6 +50,10 @@ extensions:
         providerScope: system-wide
       - capability: okdp.io/identity-provider
         providerScope: system-wide
+      # Required when the platform registers the clients (oidc.clientProvisioning dcr).
+      - capability: okdp.io/identity-client-registration
+        providerScope: system-wide
+        optional: true
       - capability: okdp.io/platform-tools
         providerScope: system-wide
       - capability: okdp.io/secrets-backend
@@ -195,7 +199,7 @@ extensions:
     sideEffects:
       external:
         - kind: identity-client
-          description: OIDC client registered through dynamic client registration when the platform provisions clients that way
+          description: OIDC clients of the sign-in and of the Trino relay, registered with the platform when it provisions the clients (dcr) and removed with the instance
     lifecycle:
       applyTimeout: 10m
       rollback: unsupported
@@ -219,8 +223,8 @@ schema:
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
-              registrationUrl: { type: string }
-              authMethod: { type: string }
+              provider: { type: string, default: platform }
+              grantee: { type: string, default: oidc-system/oidc-client-operator }
       certificateIssuers:
         required: true
         properties:
@@ -239,86 +243,44 @@ inputs:
   - { contract: trino, alias: trino, fromParameter: "datasources[].trino" }
 
 modules:
-  # Registers the OIDC client through anonymous Dynamic Client Registration.
-  # Active only when the platform provisions clients that way; the credentials
-  # land in a Secret carrying the same keys the deployment reads.
+  # The OIDC clients, registered with the platform when it provisions them (dcr).
+  # The -trino client is the one Superset obtains Trino tokens with.
   - name: oidc-dcr
     enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
-        repository: quay.io/adaltas/oidc-dcr
-        tag: 0.3.2
+        repository: ghcr.io/alex-mabrouk/charts/oidc-client
+        tag: 0.1.2
     values: |
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
-      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
-      {{- end }}
+      {{- $grantee := splitList "/" ($dcr.grantee | default "oidc-system/oidc-client-operator") -}}
+      {{- if ne (len $grantee) 2 }}{{ fail "oidc.dcr.grantee must be <namespace>/<serviceaccount>" }}{{ end }}
+      {{- $scopes := without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid" -}}
 
-      ttl_seconds: 30
-      registration_url: {{ $dcr.registrationUrl | quote }}
-      request:
-        application_type: web
-        client_name: "{{ $release }}-{{ $namespace }}"
-        redirect_uris:
-          - "https://superset-{{ $namespace }}.{{ .Context.ingress.suffix }}/oauth-authorized/{{ .Context.oidc.displayName | default "keycloak" }}"
-        grant_types:
-          - "authorization_code"
-          - "refresh_token"
-        # openid is rejected by Keycloak here.
-        scope: {{ without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid" | join " " | quote }}
-      tls:
-        insecure: false
-        certificate: "certs-bundle"
-      secret: "{{ $release }}-{{ $namespace }}-dcr"
-      mapping:
-        use_default: false
-        key_mapping:
-          client_id: ".client_id"
-          client_secret: ".client_secret"
-
-  # The client Superset obtains Trino tokens with. After oidc-dcr: both write
-  # their hook objects under the same names.
-  - name: oidc-dcr-trino
-    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
-    dependsOn:
-      - oidc-dcr
-    timeout: 10m
-    source:
-      oci:
-        repository: quay.io/adaltas/oidc-dcr
-        tag: 0.3.2
-    values: |
-      {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
-      {{- $release := printf "%v" .Release.metadata.name -}}
-      {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
-      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
-      {{- end }}
-
-      ttl_seconds: 30
-      registration_url: {{ $dcr.registrationUrl | quote }}
-      request:
-        application_type: web
-        client_name: "{{ $release }}-{{ $namespace }}-trino"
-        redirect_uris:
-          - "https://superset-{{ $namespace }}.{{ .Context.ingress.suffix }}/api/v1/database/oauth2/"
-        grant_types:
-          - "authorization_code"
-          - "refresh_token"
-        # openid is rejected by Keycloak here.
-        scope: {{ without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid" | join " " | quote }}
-      tls:
-        insecure: false
-        certificate: "certs-bundle"
-      secret: "{{ $release }}-{{ $namespace }}-dcr-trino"
-      mapping:
-        use_default: false
-        key_mapping:
-          client_id: ".client_id"
-          client_secret: ".client_secret"
+      provider: {{ $dcr.provider | default "platform" | quote }}
+      grant:
+        namespace: {{ index $grantee 0 | quote }}
+        serviceAccount: {{ index $grantee 1 | quote }}
+      clients:
+        {{ $release }}:
+          client:
+            grantTypes: [authorization_code, refresh_token]
+            redirectUris:
+              - "https://superset-{{ $namespace }}.{{ .Context.ingress.suffix }}/oauth-authorized/{{ .Context.oidc.displayName | default "keycloak" }}"
+            scopes: {{ $scopes | toJson }}
+          credentials:
+            secretName: {{ $release }}-oidc
+        {{ $release }}-trino:
+          client:
+            grantTypes: [authorization_code, refresh_token]
+            redirectUris:
+              - "https://superset-{{ $namespace }}.{{ .Context.ingress.suffix }}/api/v1/database/oauth2/"
+            scopes: {{ $scopes | toJson }}
+          credentials:
+            secretName: {{ $release }}-oidc-trino
 
   - name: internal-secrets
     source:
@@ -336,6 +298,10 @@ modules:
               encoding: hex
               length: "32"
   - name: main
+    dependsOn: |
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
+      - oidc-dcr
+      {{- end }}
     timeout: 10m
     source:
       oci:
@@ -356,8 +322,8 @@ modules:
       {{- $oauthSecret := printf "creds-%s-oauth2" $release -}}
       {{- $trinoOauthSecret := printf "creds-%s-oauth2-trino" $release -}}
       {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
-      {{- $oauthSecret = printf "%s-%s-dcr" $release $namespace -}}
-      {{- $trinoOauthSecret = printf "%s-%s-dcr-trino" $release $namespace -}}
+      {{- $oauthSecret = printf "%s-oidc" $release -}}
+      {{- $trinoOauthSecret = printf "%s-oidc-trino" $release -}}
       {{- end }}
       {{- $domain := printf "%v" .Context.ingress.suffix -}}
 

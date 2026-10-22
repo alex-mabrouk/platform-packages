@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: polaris
-tag: 2.0.0-alpha.5 # x-release-please-version
+tag: 2.0.0-alpha.6 # x-release-please-version
 description: |
   Apache Polaris is an open-source, fully-featured catalog for Apache Iceberg™.
 usage:
@@ -50,6 +50,10 @@ extensions:
         providerScope: system-wide
       - capability: okdp.io/identity-provider
         providerScope: system-wide
+      # Required when the platform registers the clients (oidc.clientProvisioning dcr).
+      - capability: okdp.io/identity-client-registration
+        providerScope: system-wide
+        optional: true
       - capability: okdp.io/platform-tools
         providerScope: system-wide
       - capability: okdp.io/secrets-backend
@@ -148,7 +152,7 @@ extensions:
     sideEffects:
       external:
         - kind: identity-client
-          description: OIDC clients of the server and the console, registered through dynamic client registration when the platform provisions clients that way
+          description: OIDC clients of the server and the console, registered with the platform when it provisions the clients (dcr) and removed with the instance
     lifecycle:
       applyTimeout: 15m
       rollback: unsupported
@@ -169,8 +173,8 @@ schema:
           # Read only when clientProvisioning is dcr.
           dcr:
             properties:
-              registrationUrl: { type: string }
-              authMethod: { type: string }
+              provider: { type: string, default: platform }
+              grantee: { type: string, default: oidc-system/oidc-client-operator }
       certificateIssuers:
         required: true
         properties:
@@ -188,84 +192,40 @@ inputs:
   - { contract: s3, alias: storage, fromParameter: storage }
 
 modules:
-  # Registers the OIDC clients through anonymous Dynamic Client Registration.
-  # Active only when the platform provisions clients that way; the credentials
-  # land in Secrets carrying the same keys the deployments read.
+  # The OIDC clients, registered with the platform when it provisions them (dcr).
   - name: oidc-dcr
     enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
     timeout: 10m
     source:
       oci:
-        repository: quay.io/adaltas/oidc-dcr
-        tag: 0.3.2
+        repository: ghcr.io/alex-mabrouk/charts/oidc-client
+        tag: 0.1.2
     values: |
       {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
-      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
-      {{- end }}
+      {{- $grantee := splitList "/" ($dcr.grantee | default "oidc-system/oidc-client-operator") -}}
+      {{- if ne (len $grantee) 2 }}{{ fail "oidc.dcr.grantee must be <namespace>/<serviceaccount>" }}{{ end }}
 
-      ttl_seconds: 30
-      registration_url: {{ $dcr.registrationUrl | quote }}
-      request:
-        application_type: web
-        client_name: "{{ $release }}-{{ $namespace }}"
-        # Required by the chart, unused by client_credentials.
-        redirect_uris:
-          - "https://polaris-{{ $namespace }}.{{ .Context.ingress.suffix }}/"
-        grant_types:
-          - "client_credentials"
-      tls:
-        insecure: false
-        certificate: "certs-bundle"
-      secret: "{{ $release }}-{{ $namespace }}-dcr"
-      mapping:
-        use_default: false
-        key_mapping:
-          client_id: ".client_id"
-          client_secret: ".client_secret"
-
-  # The public client of the console. After oidc-dcr: both write their hook
-  # objects under the same names.
-  - name: oidc-dcr-console
-    enabled: '{{ eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}'
-    dependsOn:
-      - oidc-dcr
-    timeout: 10m
-    source:
-      oci:
-        repository: quay.io/adaltas/oidc-dcr
-        tag: 0.3.2
-    values: |
-      {{- $namespace := printf "%v" .Release.spec.targetNamespace -}}
-      {{- $release := printf "%v" .Release.metadata.name -}}
-      {{- $dcr := .Context.oidc.dcr | default dict -}}
-      {{- if and (eq (.Context.oidc.clientProvisioning | default "dcr") "dcr") (ne ($dcr.authMethod | default "") "anonymous") }}
-      {{- fail (printf "oidc.dcr.authMethod %q is not supported: this package registers anonymously" ($dcr.authMethod | default "")) }}
-      {{- end }}
-
-      ttl_seconds: 30
-      registration_url: {{ $dcr.registrationUrl | quote }}
-      request:
-        application_type: web
-        client_name: "{{ $release }}-{{ $namespace }}-console"
-        token_endpoint_auth_method: "none"
-        redirect_uris:
-          - "https://polaris-console-{{ $namespace }}.{{ .Context.ingress.suffix }}/auth/callback"
-        grant_types:
-          - "authorization_code"
-          - "refresh_token"
-        # openid is rejected by Keycloak here.
-        scope: {{ append (without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid") "offline_access" | join " " | quote }}
-      tls:
-        insecure: false
-        certificate: "certs-bundle"
-      secret: "{{ $release }}-{{ $namespace }}-dcr-console"
-      mapping:
-        use_default: false
-        key_mapping:
-          client_id: ".client_id"
+      provider: {{ $dcr.provider | default "platform" | quote }}
+      grant:
+        namespace: {{ index $grantee 0 | quote }}
+        serviceAccount: {{ index $grantee 1 | quote }}
+      clients:
+        {{ $release }}:
+          client:
+            grantTypes: [client_credentials]
+          credentials:
+            secretName: {{ $release }}-oidc
+        {{ $release }}-console:
+          client:
+            tokenEndpointAuthMethod: none
+            grantTypes: [authorization_code, refresh_token]
+            redirectUris:
+              - "https://polaris-console-{{ $namespace }}.{{ .Context.ingress.suffix }}/auth/callback"
+            scopes: {{ append (without (splitList " " (.Context.oidc.scope | default "openid profile email groups")) "openid") "offline_access" | toJson }}
+          credentials:
+            secretName: {{ $release }}-oidc-console
 
   # Root credentials of the realm. Kept when the Release goes away, the
   # bootstrapped realm lives on in the database with these credentials.
@@ -339,8 +299,11 @@ modules:
             {{- toYaml (.Parameters.principals | default list) | nindent 12 }}
 
   - name: main
-    dependsOn:
+    dependsOn: |
       - bootstrap
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
+      - oidc-dcr
+      {{- end }}
     timeout: 10m
     source:
       helmRepository:
@@ -356,7 +319,7 @@ modules:
 
       {{- $oidcIssuerUri := .Context.oidc.issuerUri -}}
       {{- $oauthSecret := printf "creds-%s-oauth2" .Release.metadata.name -}}
-      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}{{- $oauthSecret = printf "%s-%s-dcr" .Release.metadata.name $namespace -}}{{- end }}
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}{{- $oauthSecret = printf "%s-oidc" .Release.metadata.name -}}{{- end }}
 
       {{- $polarisEndpointAPIUrl := printf "https://polaris-%s.%s" $namespace $domain -}}
       {{- $polarisEndpointAPIHost := regexReplaceAll "^https?://" $polarisEndpointAPIUrl "" -}}
@@ -580,7 +543,8 @@ modules:
 
       {{- $polarisEndpointConsoleUrl := printf "https://polaris-console-%s.%s" $namespace $domain -}}
       {{- $polarisEndpointConsoleHost := regexReplaceAll "^https?://" $polarisEndpointConsoleUrl "" -}}
-      {{- $dcrConsole := eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" -}}
+      {{- $consoleSecret := printf "creds-%s-oauth2-console" .Release.metadata.name -}}
+      {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}{{- $consoleSecret = printf "%s-oidc-console" .Release.metadata.name -}}{{- end }}
 
       image:
         repository: quay.io/okdp/polaris-console
@@ -594,20 +558,15 @@ modules:
 
       extraEnv:
         VITE_OIDC_ISSUER_URL: "{{ $oidcIssuerUri }}"
-        {{- if not $dcrConsole }}
-        VITE_OIDC_CLIENT_ID: "polaris-console"
-        {{- end }}
         VITE_OIDC_REDIRECT_URI: "{{ $polarisEndpointConsoleUrl }}/auth/callback"
         VITE_OIDC_SCOPE: "{{ .Context.oidc.scope | default "openid profile email groups" }} offline_access"
 
-      {{- if $dcrConsole }}
       extraEnvVars:
         - name: VITE_OIDC_CLIENT_ID
           valueFrom:
             secretKeyRef:
-              name: "{{ .Release.metadata.name }}-{{ $namespace }}-dcr-console"
+              name: {{ $consoleSecret | quote }}
               key: client_id
-      {{- end }}
 
       ingress:
         enabled: true
