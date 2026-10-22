@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: superset
-tag: 2.0.0-alpha.1 # x-release-please-version
+tag: 2.0.0-alpha.2 # x-release-please-version
 description: |
   Apache Superset - Enterprise business intelligence platform for modern data teams.
   Self-service analytics tool that enables users to create interactive dashboards, explore datasets,
@@ -31,7 +31,7 @@ extensions:
   okdp.io:
     apiVersion: okdp.io/v1alpha1
     kind: PackageDescriptor
-    appVersion: 6.0.0
+    appVersion: 6.1.0
     displayName: Apache Superset
     description: Dashboards and data exploration of a project, on its Trino catalogs
     category: bi
@@ -516,17 +516,17 @@ modules:
 
       superset:
         image:
-          repository: quay.io/okdp/superset
-          tag: 6.0.0
+          repository: ghcr.io/alex-mabrouk/okdp-superset/superset
+          tag: 6.1.0-alpha.1
           pullPolicy: IfNotPresent
         initImage:
-          repository: quay.io/okdp/superset
-          tag: 6.0.0-dockerize
+          repository: ghcr.io/alex-mabrouk/okdp-superset/superset
+          tag: 6.1.0-alpha.1-dockerize
           pullPolicy: IfNotPresent
         supersetWebsockets:
           image:
-            repository: quay.io/okdp/superset
-            tag: 6.0.0-websocket
+            repository: ghcr.io/alex-mabrouk/okdp-superset/superset
+            tag: 6.1.0-alpha.1-websocket
             pullPolicy: IfNotPresent
 
         extraConfigs:
