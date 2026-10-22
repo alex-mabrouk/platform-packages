@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: superset
-tag: 2.0.0-alpha.4 # x-release-please-version
+tag: 2.0.0-alpha.5 # x-release-please-version
 description: |
   Apache Superset - Enterprise business intelligence platform for modern data teams.
   Self-service analytics tool that enables users to create interactive dashboards, explore datasets,
@@ -497,7 +497,7 @@ modules:
 
         extraConfigs:
           import_datasources.yaml: |
-            databases:
+            databases:{{ if not .Parameters.datasources }} []{{ end }}
             {{- range $i, $d := .Parameters.datasources }}
               - database_name: {{ $d.name }}
                 sqlalchemy_uri: "{{ (index $.InputLists "trino" $i).uri }}/{{ $d.catalog }}"
