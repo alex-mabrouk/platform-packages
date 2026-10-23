@@ -109,38 +109,38 @@ jobs:
           go-version: "1.27"
           cache: false
 
-      # Built from the fork at a pinned commit: a package carrying an OKDP
-      # descriptor has an extensions block, which the released kubocd refuses,
-      # and --config/--configMediaType/--artifactType are not released either.
+      # The public, pinned CLI image contains the executable at /kubocd.
+      # Extract it so package scripts can invoke kubocd directly on the runner.
       - name: Install KuboCD CLI 🛠️
         env:
-          KUBOCD_REPO: https://github.com/alex-mabrouk/kubocd.git
-          KUBOCD_REF: 37ee4d0fef2ca8228c3a359567bbb67143f9d6bb
+          KUBOCD_IMAGE: ghcr.io/alex-mabrouk/kubocd/exec/kubocd:v0.3.3-okdp.3
         run: |
-          git clone --filter=blob:none "${KUBOCD_REPO}" "${RUNNER_TEMP}/kubocd"
-          cd "${RUNNER_TEMP}/kubocd"
-          git checkout --detach "${KUBOCD_REF}"
-          CGO_ENABLED=0 go build \
-            -ldflags "-X kubocd/internal/global.Version=git-${KUBOCD_REF}" \
-            -o kubocd cmd/kubocd/main.go
-          sudo mv kubocd /usr/local/bin/
+          docker pull "${KUBOCD_IMAGE}"
+          container=$(docker create "${KUBOCD_IMAGE}")
+          trap 'docker rm -f "${container}" >/dev/null 2>&1 || true' EXIT
+          docker cp "${container}:/kubocd" "${RUNNER_TEMP}/kubocd"
+          sudo install -m 0755 "${RUNNER_TEMP}/kubocd" /usr/local/bin/kubocd
           kubocd version
 
-      # Checks the OKDP descriptor and writes the artifact config. The
-      # capability registry is read from the same commit (v0.1.12).
+      # Check out the private contract repository at a pinned release tag.
+      - name: Checkout private okdp-contract 🔐
+        uses: actions/checkout@v4
+        with:
+          repository: alex-mabrouk/okdp-contract
+          ref: v0.1.13
+          token: ${{ secrets.OKDP_CONTRACT_READ_TOKEN }}
+          path: .tmp/okdp-contract
+          persist-credentials: false
+
+      # Checks the OKDP descriptor and writes the artifact config.
       # OKDP_CONTRACT is the target contract version the packages are checked
       # against: every rule up to it applies.
       - name: Install okdp-contract CLI 🛠️
-        env:
-          OKDP_CONTRACT_REPO: https://github.com/alex-mabrouk/okdp-contract.git
-          OKDP_CONTRACT_REF: d8d40ccbb6bea6b9e8704c4b51cd1f536cb628af
         run: |
-          git clone --filter=blob:none "${OKDP_CONTRACT_REPO}" "${RUNNER_TEMP}/okdp-contract"
-          cd "${RUNNER_TEMP}/okdp-contract"
-          git checkout --detach "${OKDP_CONTRACT_REF}"
+          cd .tmp/okdp-contract
           CGO_ENABLED=0 go build -o okdp-contract ./cmd/okdp-contract
           sudo mv okdp-contract /usr/local/bin/
-          echo "OKDP_CAPABILITIES=${RUNNER_TEMP}/okdp-contract/docs/contract/packaging-capabilities.yaml" >> $GITHUB_ENV
+          echo "OKDP_CAPABILITIES=${GITHUB_WORKSPACE}/.tmp/okdp-contract/docs/contract/packaging-capabilities.yaml" >> $GITHUB_ENV
           echo "OKDP_CONTRACT=0.2" >> $GITHUB_ENV
 
       - name: Install yq

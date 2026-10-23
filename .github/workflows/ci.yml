@@ -101,3 +101,4 @@ jobs:
       publish_to_registry: "false"
       oci_package_prefix: "${{ needs.get-package-oci-prefix.outputs.oci_package_prefix }}"
       runs-on: "ubuntu-latest"
+    secrets: inherit

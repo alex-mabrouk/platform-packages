@@ -16,7 +16,7 @@
 
 apiVersion: v1alpha1
 name: superset
-tag: 2.0.0-alpha.5 # x-release-please-version
+tag: 2.0.0-alpha.6 # x-release-please-version
 description: |
   Apache Superset - Enterprise business intelligence platform for modern data teams.
   Self-service analytics tool that enables users to create interactive dashboards, explore datasets,
@@ -64,7 +64,7 @@ extensions:
       $schema: https://json-schema.org/draft/2020-12/schema
       type: object
       additionalProperties: false
-      required: [metadataDb, examplesDb]
+      required: [metadataDb, examplesDb, redis]
       properties:
         metadataDb:
           type: string
@@ -74,6 +74,14 @@ extensions:
           x-okdp-group: Cluster
           x-okdp-order: 1
           x-okdp-connection: metadata-db
+        redis:
+          type: string
+          minLength: 1
+          title: Redis-compatible connection
+          description: "Redis-compatible cache and Celery broker. Select an okdp-valkey instance or an external compatible service."
+          x-okdp-group: Cluster
+          x-okdp-order: 2
+          x-okdp-connection: redis-compatible
         load_examples:
           type: boolean
           default: true
@@ -190,6 +198,10 @@ extensions:
           contract: trino
           version: "1"
           description: Trino instance of each datasource
+        - name: redis-compatible
+          contract: redis-compatible
+          version: "1"
+          description: Redis-compatible cache and Celery broker
     endpoints:
       - name: ui
         kind: ui
@@ -241,6 +253,7 @@ inputs:
   - { contract: database-server, alias: metadata-db, fromParameter: metadataDb }
   - { contract: database-server, alias: examples-db, fromParameter: examplesDb }
   - { contract: trino, alias: trino, fromParameter: "datasources[].trino" }
+  - { contract: redis-compatible, alias: redis-compatible, fromParameter: redis }
 
 modules:
   # The OIDC clients, registered with the platform when it provisions them (dcr).
@@ -293,10 +306,6 @@ modules:
             - fieldName: superset_secret_key
               encoding: base64
               length: "42"
-            # hex: the password lands in a redis:// URL, where base64 padding would need escaping.
-            - fieldName: redis-password
-              encoding: hex
-              length: "32"
   - name: main
     dependsOn: |
       {{- if eq (.Context.oidc.clientProvisioning | default "dcr") "dcr" }}
@@ -313,6 +322,7 @@ modules:
       {{- $release := printf "%v" .Release.metadata.name -}}
       {{- $metadataDb := index .Inputs "metadata-db" -}}
       {{- $examplesDb := index .Inputs "examples-db" -}}
+      {{- $redis := index .Inputs "redis-compatible" -}}
       {{- $oidcEnabled := true -}}
       {{- if hasKey .Context.oidc "enabled" }}{{- $oidcEnabled = .Context.oidc.enabled -}}{{ end -}}
       {{- $oidcUsePKCE := true -}}
@@ -523,15 +533,9 @@ modules:
         postgresql:
           # Use an external database
           enabled: false
-        # If no existing redis cache provided, enable to use the bitnami redis cache
-        # The credentials should match 'superset.supersetNode.connections'
+        # Redis-compatible service is a required connection, managed by okdp-valkey or external.
         redis:
-          enabled: true
-          architecture: standalone
-          auth:
-            enabled: true
-            existingSecret: {{ printf "creds-%s-internal" $release }}
-            existingSecretPasswordKey: redis-password
+          enabled: false
         extraEnvRaw:
           # Superset secret key
           - name: SUPERSET_SECRET_KEY
@@ -550,12 +554,17 @@ modules:
               secretKeyRef:
                 name: {{ $metadataDb.secretRef }}
                 key: password
-          # Superset/Redis credentials
+          # Redis-compatible credentials stay in the connection's Kubernetes Secret.
+          - name: REDIS_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ $redis.secretRef }}
+                key: username
           - name: REDIS_PASSWORD
             valueFrom:
               secretKeyRef:
-                name: {{ printf "creds-%s-internal" $release }}
-                key: redis-password
+                name: {{ $redis.secretRef }}
+                key: password
           {{- if $oidcEnabled }}
           # OIDC credentials
           - name: AUTH_OAUTH_CLIENT_ID
@@ -679,17 +688,17 @@ modules:
             db_user: ~
             db_pass: ~
             # -- Redis
-            redis_host: {{ printf "%s-main-redis-headless" $release | quote }}
-            redis_port: 6379
-            redis_user: ~
+            redis_host: {{ $redis.host | quote }}
+            redis_port: {{ $redis.port }}
+            redis_user: "set-from-env"
             # Flag only: the chart switches the URL to its authenticated form,
             # which reads the value from the REDIS_PASSWORD variable below.
             redis_password: "set-from-env"
             redis_cache_db: "1"
             redis_celery_db: "0"
             redis_ssl:
-              enabled: false
-              ssl_cert_reqs: CERT_NONE
+              enabled: {{ $redis.tls | default false }}
+              ssl_cert_reqs: CERT_REQUIRED
 
         ingress:
           enabled: true
